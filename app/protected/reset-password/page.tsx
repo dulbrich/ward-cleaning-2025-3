@@ -3,6 +3,15 @@ import { FormMessage, Message } from "@/components/form-message";
 import { SubmitButton } from "@/components/submit-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { redirect } from "next/navigation";
+
+// Create a wrapper function that handles the Promise<string> return
+const handleResetPassword = async (formData: FormData) => {
+  const result = await resetPasswordAction(formData);
+  if (result && result.includes("?")) {
+    redirect(`/protected/reset-password${result}`);
+  }
+};
 
 export default async function ResetPassword(props: {
   searchParams: Promise<Message>;
@@ -28,7 +37,7 @@ export default async function ResetPassword(props: {
         placeholder="Confirm password"
         required
       />
-      <SubmitButton formAction={resetPasswordAction}>
+      <SubmitButton formAction={handleResetPassword}>
         Reset password
       </SubmitButton>
       <FormMessage message={searchParams} />
