@@ -19,6 +19,7 @@ export async function GET(request: Request) {
     return NextResponse.redirect(`${origin}${redirectTo}`);
   }
 
-  // URL to redirect to after sign up process completes
-  return NextResponse.redirect(`${origin}/protected`);
+  // URL to redirect to after sign up process completes - direct to onboarding
+  // Include a message for the user that email verification was successful
+  return NextResponse.redirect(`${origin}/onboarding?type=success&message=Email verified successfully. Please complete your profile.`);
 }

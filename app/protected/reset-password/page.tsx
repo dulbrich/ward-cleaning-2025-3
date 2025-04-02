@@ -1,24 +1,38 @@
+"use client";
+
 import { resetPasswordAction } from "@/app/actions";
-import { FormMessage, Message } from "@/components/form-message";
+import { FormMessage } from "@/components/form-message";
 import { SubmitButton } from "@/components/submit-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { redirect } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
-// Create a wrapper function that handles the Promise<string> return
-const handleResetPassword = async (formData: FormData) => {
-  const result = await resetPasswordAction(formData);
-  if (result && result.includes("?")) {
-    redirect(`/protected/reset-password${result}`);
-  }
-};
+export default function ResetPassword() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  
+  // Extract message from search params
+  const messageType = searchParams.get('type');
+  const messageContent = searchParams.get('message');
+  
+  const searchParamsMessage = messageType && messageContent 
+    ? { type: messageType, message: messageContent } 
+    : null;
 
-export default async function ResetPassword(props: {
-  searchParams: Promise<Message>;
-}) {
-  const searchParams = await props.searchParams;
+  // Create a wrapper function that handles the Promise<string> return
+  const handleResetPassword = async (formData: FormData) => {
+    try {
+      const result = await resetPasswordAction(formData);
+      if (result && result.includes("?")) {
+        router.push(`/protected/reset-password${result}`);
+      }
+    } catch (error) {
+      console.error("Error resetting password:", error);
+    }
+  };
+
   return (
-    <form className="flex flex-col w-full max-w-md p-4 gap-2 [&>input]:mb-4">
+    <form action={handleResetPassword} className="flex flex-col w-full max-w-md p-4 gap-2 [&>input]:mb-4">
       <h1 className="text-2xl font-medium">Reset password</h1>
       <p className="text-sm text-foreground/60">
         Please enter your new password below.
@@ -37,10 +51,10 @@ export default async function ResetPassword(props: {
         placeholder="Confirm password"
         required
       />
-      <SubmitButton formAction={handleResetPassword}>
+      <SubmitButton>
         Reset password
       </SubmitButton>
-      <FormMessage message={searchParams} />
+      {searchParamsMessage && <FormMessage message={searchParamsMessage} />}
     </form>
   );
 }

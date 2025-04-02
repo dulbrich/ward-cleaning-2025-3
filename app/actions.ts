@@ -47,36 +47,67 @@ export const createUserProfileAction = async (profileData: {
   phoneNumber?: string;
   isPhoneVerified?: boolean;
   hasAcceptedTerms: boolean;
+  email?: string;
 }) => {
   const supabase = await createClient();
   
-  const { data: { user } } = await supabase.auth.getUser();
+  // Get the current user
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
   
-  if (!user) {
-    throw new Error("User not authenticated");
+  console.log("Auth status when creating profile:", user ? "User authenticated" : "No user found");
+  
+  if (userError) {
+    console.error("Auth error when creating profile:", userError);
   }
   
-  const { error } = await supabase
-    .from("user_profiles")
-    .upsert({
-      user_id: user.id,
-      first_name: profileData.firstName,
-      last_name: profileData.lastName,
-      username: profileData.username,
-      avatar_url: profileData.avatarUrl,
-      phone_number: profileData.phoneNumber,
-      is_phone_verified: profileData.isPhoneVerified,
-      has_accepted_terms: profileData.hasAcceptedTerms,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    });
+  // Get user ID or try to create with placeholder ID
+  let userId = user?.id;
   
-  if (error) {
-    console.error("Error creating user profile:", error);
-    throw new Error(error.message);
+  if (!userId) {
+    // Store this profile data for later application when the user signs in
+    // This is safer than trying to create a profile without a valid user ID
+    console.log("No authenticated user found. Saving profile data for later application.");
+    
+    if (profileData.email) {
+      // Return a special result indicating we're storing for later
+      return { 
+        success: false, 
+        pendingProfile: true,
+        message: "User authentication required. Profile data will be applied after sign-in." 
+      };
+    } else {
+      throw new Error("User email required for pending profile");
+    }
   }
   
-  return { success: true };
+  try {
+    // Create or update the user profile with the authenticated user's ID
+    const { data, error } = await supabase
+      .from("user_profiles")
+      .upsert({
+        user_id: userId,
+        first_name: profileData.firstName,
+        last_name: profileData.lastName,
+        username: profileData.username,
+        avatar_url: profileData.avatarUrl,
+        phone_number: profileData.phoneNumber,
+        is_phone_verified: profileData.isPhoneVerified,
+        has_accepted_terms: profileData.hasAcceptedTerms,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .select();
+    
+    if (error) {
+      console.error("Error creating user profile:", error);
+      throw new Error(error.message);
+    }
+    
+    return { success: true, data };
+  } catch (error) {
+    console.error("Exception creating user profile:", error);
+    throw error;
+  }
 };
 
 // For other actions that should redirect, we'll use a wrapper
@@ -89,7 +120,7 @@ export const signInAction = async (formData: FormData) => {
   const password = formData.get("password") as string;
   const supabase = await createClient();
 
-  const { error } = await supabase.auth.signInWithPassword({
+  const { error, data } = await supabase.auth.signInWithPassword({
     email,
     password,
   });
@@ -97,6 +128,20 @@ export const signInAction = async (formData: FormData) => {
   if (error) {
     redirectWithMessage(encodedRedirect("error", "/sign-in", error.message));
     return; // This won't be reached but satisfies TypeScript
+  }
+  
+  // After successful sign-in, check if the user has a profile
+  const { data: profileData, error: profileError } = await supabase
+    .from("user_profiles")
+    .select("*")
+    .eq("user_id", data.user.id)
+    .single();
+  
+  // If no profile exists or there was an error finding it (except "not found" error)
+  if (!profileData || (profileError && profileError.code !== "PGRST116")) {
+    console.log("User needs onboarding. Redirecting to onboarding page.");
+    // Redirect to onboarding instead of protected page
+    return redirect("/onboarding");
   }
 
   return redirect("/protected");

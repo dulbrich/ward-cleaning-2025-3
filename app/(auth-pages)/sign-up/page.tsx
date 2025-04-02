@@ -1,11 +1,9 @@
 "use client";
 
-import { createUserProfileAction, signUpAction } from "@/app/actions";
+import { signUpAction } from "@/app/actions";
 import { FormMessage, Message } from "@/components/form-message";
-import { MultiStepSignup } from "@/components/signup/multi-step-signup";
-import { SignupFormData } from "@/components/signup/types";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { SmtpMessage } from "../smtp-message";
 
@@ -31,9 +29,7 @@ export default function SignupPage() {
 
 function Signup() {
   const searchParams = useSearchParams();
-  const router = useRouter();
   const [message, setMessage] = useState<Message | null>(null);
-  const [isSimpleForm, setIsSimpleForm] = useState(false);
 
   // Handle search params on initial load
   useEffect(() => {
@@ -51,40 +47,6 @@ function Signup() {
     }
   }, [searchParams]);
 
-  const handleMultiStepFormSubmit = async (formData: SignupFormData): Promise<void> => {
-    try {
-      // First, create the Supabase Auth user
-      const formDataObj = new FormData();
-      formDataObj.append("email", formData.email);
-      formDataObj.append("password", formData.password);
-      
-      const result = await signUpAction(formDataObj);
-      
-      // Parse the redirected URL to get message data
-      if (result) {
-        const urlParams = new URLSearchParams(result.split("?")[1]);
-        const messageType = urlParams.get("type");
-        const messageContent = urlParams.get("message");
-        
-        if (messageType && messageContent) {
-          if (messageType === "error") {
-            setMessage({ error: messageContent });
-          } else {
-            setMessage({ success: messageContent });
-            
-            // If sign-up was successful, create the user profile
-            if (messageType === "success") {
-              await createUserProfileAction(formData);
-            }
-          }
-        }
-      }
-    } catch (error) {
-      console.error("Error in signup process:", error);
-      setMessage({ error: "An error occurred during signup" });
-    }
-  };
-
   // Show message if there is one
   if (message) {
     return (
@@ -101,20 +63,10 @@ function Signup() {
           <Link className="text-sm text-foreground hover:underline" href="/sign-in">
             Already have an account? Sign in
           </Link>
-          <button 
-            onClick={() => setIsSimpleForm(!isSimpleForm)}
-            className="text-xs text-muted-foreground hover:underline"
-          >
-            {isSimpleForm ? "Use detailed signup" : "Simple signup"}
-          </button>
         </div>
       </div>
 
-      {isSimpleForm ? (
-        <SimpleSignupForm setMessage={setMessage} />
-      ) : (
-        <MultiStepSignup onSubmit={handleMultiStepFormSubmit} />
-      )}
+      <SimpleSignupForm setMessage={setMessage} />
       
       <div className="mt-6">
         <SmtpMessage />
@@ -123,10 +75,12 @@ function Signup() {
   );
 }
 
-// Simple form for backward compatibility
 function SimpleSignupForm({ setMessage }: { setMessage: (message: Message) => void }) {
+  const [loading, setLoading] = useState(false);
+
   const handleFormSubmit = async (formData: FormData) => {
     try {
+      setLoading(true);
       const result = await signUpAction(formData);
       
       // Parse the redirected URL to get message data
@@ -146,39 +100,55 @@ function SimpleSignupForm({ setMessage }: { setMessage: (message: Message) => vo
     } catch (error) {
       console.error("Error in signup process:", error);
       setMessage({ error: "An error occurred during signup" });
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <form action={handleFormSubmit} className="flex flex-col min-w-64 max-w-64 mx-auto">
-      <h1 className="text-2xl font-medium">Sign up</h1>
-      <div className="flex flex-col gap-2 [&>input]:mb-3 mt-8">
-        <label htmlFor="email">Email</label>
-        <input 
-          id="email" 
-          name="email" 
-          type="email" 
-          placeholder="you@example.com" 
-          required 
-          className="px-3 py-2 border rounded-md"
-        />
-        <label htmlFor="password">Password</label>
-        <input 
-          id="password" 
-          name="password" 
-          type="password" 
-          placeholder="Your password" 
-          minLength={6} 
-          required 
-          className="px-3 py-2 border rounded-md"
-        />
+    <form action={handleFormSubmit} className="flex flex-col w-full max-w-sm mx-auto">
+      <h1 className="text-2xl font-medium mb-6">Create an account</h1>
+      <div className="flex flex-col gap-4">
+        <div className="space-y-2">
+          <label htmlFor="email" className="text-sm font-medium">Email</label>
+          <input 
+            id="email" 
+            name="email" 
+            type="email" 
+            placeholder="you@example.com" 
+            required 
+            className="w-full px-3 py-2 border rounded-md"
+          />
+        </div>
+        <div className="space-y-2">
+          <label htmlFor="password" className="text-sm font-medium">Password</label>
+          <input 
+            id="password" 
+            name="password" 
+            type="password" 
+            placeholder="Your password" 
+            minLength={6} 
+            required 
+            className="w-full px-3 py-2 border rounded-md"
+          />
+          <p className="text-xs text-muted-foreground">
+            Password must be at least 6 characters long
+          </p>
+        </div>
         <button 
           type="submit" 
-          className="bg-primary text-white px-4 py-2 rounded-md hover:bg-primary/90"
+          className="mt-2 bg-primary text-white px-4 py-2 rounded-md hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+          disabled={loading}
         >
-          Sign up
+          {loading ? "Signing up..." : "Sign up"}
         </button>
       </div>
+      <p className="text-xs text-muted-foreground text-center mt-4">
+        By signing up, you agree to our{" "}
+        <Link href="/terms" className="underline">Terms of Service</Link>{" "}
+        and{" "}
+        <Link href="/privacy" className="underline">Privacy Policy</Link>
+      </p>
     </form>
   );
 }

@@ -44,6 +44,11 @@ export const updateSession = async (request: NextRequest) => {
       return NextResponse.redirect(new URL("/sign-in", request.url));
     }
 
+    // Allow access to onboarding only when authenticated
+    if (request.nextUrl.pathname.startsWith("/onboarding") && user.error) {
+      return NextResponse.redirect(new URL("/sign-in", request.url));
+    }
+
     if (request.nextUrl.pathname === "/" && !user.error) {
       return NextResponse.redirect(new URL("/protected", request.url));
     }
