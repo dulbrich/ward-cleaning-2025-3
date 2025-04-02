@@ -38,8 +38,7 @@ export default async function ProtectedPage({
   searchParams
 }: {
   searchParams?: { 
-    type?: string;
-    message?: string;
+    [key: string]: string | string[] | undefined 
   };
 }) {
   const supabase = await createClient();
@@ -58,13 +57,17 @@ export default async function ProtectedPage({
   // Build message from search params if present
   let message: Message | null = null;
   
-  if (searchParams?.type && searchParams?.message) {
-    if (searchParams.type === 'error') {
-      message = { error: searchParams.message };
-    } else if (searchParams.type === 'success') {
-      message = { success: searchParams.message };
+  // Safely access search params
+  const type = searchParams?.type;
+  const messageContent = searchParams?.message;
+  
+  if (typeof type === 'string' && typeof messageContent === 'string') {
+    if (type === 'error') {
+      message = { error: messageContent };
+    } else if (type === 'success') {
+      message = { success: messageContent };
     } else {
-      message = { message: searchParams.message };
+      message = { message: messageContent };
     }
   }
 
