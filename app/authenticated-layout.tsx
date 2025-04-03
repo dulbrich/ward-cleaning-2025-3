@@ -337,7 +337,7 @@ export default function AuthenticatedLayout({
       {/* Sidebar Navigation */}
       <aside 
         className={`
-          fixed inset-y-0 left-0 z-40
+          fixed inset-y-0 left-0 z-50
           flex flex-col bg-card border-r shadow-sm
           transition-all duration-200 ease-out
           ${isSidebarOpen || !isMobile ? 'translate-x-0' : '-translate-x-full'}
@@ -400,7 +400,7 @@ export default function AuthenticatedLayout({
         className={`
           mt-[60px] pt-6 pb-12 px-4 md:px-6
           transition-all duration-200 ease-out
-          ${sidebarIsExpanded ? 'md:ml-60' : 'md:ml-16'}
+          ml-0 md:ml-16
         `}
       >
         <div className="mx-auto max-w-6xl">
