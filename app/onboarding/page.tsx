@@ -194,7 +194,7 @@ export default function OnboardingPage() {
       
       // Redirect to protected page after a short delay
       setTimeout(() => {
-        router.push('/protected');
+        router.push('/app');
       }, 1500);
       
     } catch (err: any) {
