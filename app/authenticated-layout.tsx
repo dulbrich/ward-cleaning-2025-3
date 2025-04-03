@@ -29,6 +29,7 @@ import {
     Wrench,
     X
 } from "lucide-react";
+import dynamic from "next/dynamic";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -41,6 +42,27 @@ type NavItem = {
   badge?: number | null;
   active?: boolean;
 };
+
+// Component for the mobile sidebar overlay
+const MobileSidebarOverlayComponent = ({ isMobile, isSidebarOpen, setIsSidebarOpen }: { 
+  isMobile: boolean; 
+  isSidebarOpen: boolean; 
+  setIsSidebarOpen: (open: boolean) => void; 
+}) => (
+  <>
+    {isMobile && isSidebarOpen && (
+      <div 
+        className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40"
+        onClick={() => setIsSidebarOpen(false)}
+      />
+    )}
+  </>
+);
+
+// Dynamically import heavy components
+const MobileSidebarOverlay = dynamic(() => 
+  Promise.resolve(MobileSidebarOverlayComponent)
+, { ssr: false });
 
 export default function AuthenticatedLayout({
   children,
@@ -201,6 +223,7 @@ export default function AuthenticatedLayout({
           : 'text-foreground/70 hover:bg-muted hover:text-foreground'}
         h-11 relative
       `}
+      prefetch={true}
     >
       <div className="w-16 flex justify-center items-center flex-shrink-0">
         <span className="relative">
@@ -221,18 +244,6 @@ export default function AuthenticatedLayout({
         {item.title}
       </span>
     </Link>
-  );
-
-  // Component for the mobile sidebar overlay
-  const MobileSidebarOverlay = () => (
-    <>
-      {isMobile && isSidebarOpen && (
-        <div 
-          className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40"
-          onClick={() => setIsSidebarOpen(false)}
-        />
-      )}
-    </>
   );
 
   // Create a custom scrollbar style class
@@ -332,7 +343,7 @@ export default function AuthenticatedLayout({
       </header>
 
       {/* Mobile Sidebar Overlay */}
-      <MobileSidebarOverlay />
+      <MobileSidebarOverlay isMobile={isMobile} isSidebarOpen={isSidebarOpen} setIsSidebarOpen={setIsSidebarOpen} />
 
       {/* Sidebar Navigation */}
       <aside 
