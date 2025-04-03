@@ -15,8 +15,6 @@ import {
     Bell,
     BookOpen,
     Calendar,
-    ChevronLeft,
-    ChevronRight,
     ClipboardList,
     Cog,
     FileText,
@@ -34,7 +32,7 @@ import {
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type NavItem = {
   title: string;
@@ -50,17 +48,17 @@ export default function AuthenticatedLayout({
   children: React.ReactNode;
 }>) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [isSidebarExpanded, setIsSidebarExpanded] = useState(true);
+  const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
+  const [isHovering, setIsHovering] = useState(false);
+  const [showScrollbar, setShowScrollbar] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const expandTimerRef = useRef<NodeJS.Timeout | null>(null);
   const pathname = usePathname();
 
   // Check screen size on component mount and window resize
   useEffect(() => {
     const checkScreenSize = () => {
       setIsMobile(window.innerWidth < 768);
-      if (window.innerWidth < 1024) {
-        setIsSidebarExpanded(false);
-      }
     };
 
     // Initial check
@@ -72,6 +70,39 @@ export default function AuthenticatedLayout({
     // Clean up
     return () => window.removeEventListener("resize", checkScreenSize);
   }, []);
+
+  // Helper to determine sidebar expansion state
+  const sidebarIsExpanded = isMobile ? isSidebarExpanded : (isSidebarExpanded || isHovering);
+
+  // Handle hover with delayed scrollbar appearance
+  const handleMouseEnter = () => {
+    if (isMobile) return;
+    
+    setIsHovering(true);
+    
+    // Clear any existing timers
+    if (expandTimerRef.current) {
+      clearTimeout(expandTimerRef.current);
+    }
+    
+    // Delay showing the scrollbar until after the expansion animation completes
+    expandTimerRef.current = setTimeout(() => {
+      setShowScrollbar(true);
+    }, 200); // Match this to the transition duration
+  };
+
+  const handleMouseLeave = () => {
+    if (isMobile) return;
+    
+    setIsHovering(false);
+    setShowScrollbar(false);
+    
+    // Clear any pending timers
+    if (expandTimerRef.current) {
+      clearTimeout(expandTimerRef.current);
+      expandTimerRef.current = null;
+    }
+  };
 
   // Member section navigation items
   const memberItems: NavItem[] = [
@@ -163,23 +194,32 @@ export default function AuthenticatedLayout({
       href={item.href}
       key={item.href}
       className={`
-        flex items-center px-3 py-3 rounded-md text-sm font-medium
+        flex items-center rounded-md text-sm font-medium
         transition-colors duration-150 ease-in-out
         ${item.active 
           ? 'bg-primary/10 text-primary' 
           : 'text-foreground/70 hover:bg-muted hover:text-foreground'}
-        ${isSidebarExpanded ? 'justify-start' : 'justify-center'}
+        h-11 relative
       `}
     >
-      <span className="relative">
-        {item.icon}
-        {item.badge && (
-          <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] font-medium text-primary-foreground">
-            {item.badge}
-          </span>
-        )}
+      <div className="w-16 flex justify-center items-center flex-shrink-0">
+        <span className="relative">
+          {item.icon}
+          {item.badge && (
+            <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] font-medium text-primary-foreground">
+              {item.badge}
+            </span>
+          )}
+        </span>
+      </div>
+      <span 
+        className={`
+          whitespace-nowrap transition-opacity duration-200 overflow-hidden
+          ${sidebarIsExpanded ? 'opacity-100 max-w-[200px]' : 'opacity-0 max-w-0'}
+        `}
+      >
+        {item.title}
       </span>
-      {isSidebarExpanded && <span className="ml-3">{item.title}</span>}
     </Link>
   );
 
@@ -194,6 +234,12 @@ export default function AuthenticatedLayout({
       )}
     </>
   );
+
+  // Create a custom scrollbar style class
+  const scrollbarClass = `
+    scrollbar-container
+    ${showScrollbar ? 'overflow-y-auto' : 'overflow-hidden'}
+  `;
 
   // Main layout structure
   return (
@@ -295,23 +341,15 @@ export default function AuthenticatedLayout({
           flex flex-col bg-card border-r shadow-sm
           transition-all duration-200 ease-out
           ${isSidebarOpen || !isMobile ? 'translate-x-0' : '-translate-x-full'}
-          ${isSidebarExpanded ? 'w-60' : 'w-16'}
+          ${sidebarIsExpanded ? 'w-60' : 'w-16'}
           top-[60px] md:top-[60px]
         `}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
       >
-        {/* Sidebar Header with Toggle Button */}
-        <div className="flex items-center justify-end p-2 border-b h-12">
-          {!isMobile && (
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              onClick={() => setIsSidebarExpanded(!isSidebarExpanded)}
-              className="h-8 w-8"
-            >
-              {isSidebarExpanded ? <ChevronLeft size={18} /> : <ChevronRight size={18} />}
-            </Button>
-          )}
-          {isMobile && (
+        {/* Mobile only - Sidebar Header with Close Button */}
+        {isMobile && (
+          <div className="flex items-center justify-end p-2 border-b h-12">
             <Button 
               variant="ghost" 
               size="icon" 
@@ -320,30 +358,36 @@ export default function AuthenticatedLayout({
             >
               <X size={18} />
             </Button>
-          )}
-        </div>
+          </div>
+        )}
           
         {/* Sidebar Content */}
-        <div className="flex-1 overflow-y-auto py-4 px-3">
+        <div className={`flex-1 py-4 ${scrollbarClass}`}>
           {/* Members Section */}
-          <div className="mb-6">
-            {isSidebarExpanded && (
-              <h3 className="mb-2 px-3 text-xs font-semibold text-muted-foreground tracking-wider uppercase">
+          <div className="mb-6 relative">
+            <div className={`
+              transition-opacity duration-200 h-6 px-4 mb-2
+              ${sidebarIsExpanded ? 'opacity-100' : 'opacity-0'}
+            `}>
+              <h3 className="text-xs font-semibold text-muted-foreground tracking-wider uppercase">
                 Members
               </h3>
-            )}
+            </div>
             <div className="space-y-1">
               {memberItems.map(renderNavItem)}
             </div>
           </div>
           
           {/* Admin Section */}
-          <div>
-            {isSidebarExpanded && (
-              <h3 className="mb-2 px-3 text-xs font-semibold text-muted-foreground tracking-wider uppercase">
+          <div className="relative">
+            <div className={`
+              transition-opacity duration-200 h-6 px-4 mb-2
+              ${sidebarIsExpanded ? 'opacity-100' : 'opacity-0'}
+            `}>
+              <h3 className="text-xs font-semibold text-muted-foreground tracking-wider uppercase">
                 Admin
               </h3>
-            )}
+            </div>
             <div className="space-y-1">
               {adminItems.map(renderNavItem)}
             </div>
@@ -356,7 +400,7 @@ export default function AuthenticatedLayout({
         className={`
           mt-[60px] pt-6 pb-12 px-4 md:px-6
           transition-all duration-200 ease-out
-          ${isSidebarExpanded ? 'md:ml-60' : 'md:ml-16'}
+          ${sidebarIsExpanded ? 'md:ml-60' : 'md:ml-16'}
         `}
       >
         <div className="mx-auto max-w-6xl">
