@@ -82,7 +82,13 @@ export default function AuthenticatedLayout({
   // Check screen size on component mount and window resize
   useEffect(() => {
     const checkScreenSize = () => {
-      setIsMobile(window.innerWidth < 768);
+      const mobileView = window.innerWidth < 768;
+      setIsMobile(mobileView);
+      
+      // Close sidebar automatically when switching to mobile view
+      if (mobileView) {
+        setIsSidebarOpen(false);
+      }
     };
 
     // Initial check
@@ -371,7 +377,10 @@ export default function AuthenticatedLayout({
           fixed inset-y-0 left-0 z-50
           flex flex-col bg-card border-r shadow-sm
           transition-all duration-200 ease-out
-          ${isSidebarOpen || !isMobile ? 'translate-x-0' : '-translate-x-full'}
+          ${isMobile 
+            ? (isSidebarOpen ? 'translate-x-0' : '-translate-x-full') 
+            : 'translate-x-0'
+          }
           ${sidebarIsExpanded ? 'w-60' : 'w-16'}
           top-[60px] md:top-[60px]
         `}
@@ -431,7 +440,10 @@ export default function AuthenticatedLayout({
         className={`
           mt-[60px] pt-6 pb-12 px-4 md:px-6
           transition-all duration-200 ease-out
-          ml-0 md:ml-16
+          ${isMobile 
+            ? 'ml-0' 
+            : (isSidebarExpanded ? 'ml-0 md:ml-60' : 'ml-0 md:ml-16')
+          }
         `}
       >
         <div className="mx-auto max-w-6xl">
