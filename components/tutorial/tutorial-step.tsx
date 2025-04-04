@@ -8,7 +8,7 @@ export function TutorialStep({
   children: React.ReactNode;
 }) {
   return (
-    <li className="relative">
+    <li className="relative w-full">
       <Checkbox
         id={title}
         name={title}
@@ -16,11 +16,11 @@ export function TutorialStep({
       />
       <label
         htmlFor={title}
-        className={`relative text-base text-foreground peer-checked:line-through font-medium`}
+        className={`relative text-base text-foreground peer-checked:line-through font-medium block w-full`}
       >
-        <span className="ml-8">{title}</span>
+        <span className="ml-8 block break-words">{title}</span>
         <div
-          className={`ml-8 text-sm peer-checked:line-through font-normal text-muted-foreground`}
+          className={`ml-8 text-sm peer-checked:line-through font-normal text-muted-foreground w-full`}
         >
           {children}
         </div>

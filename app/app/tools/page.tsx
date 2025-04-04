@@ -58,7 +58,7 @@ function CodeBlock({ code }: { code: string }) {
   };
 
   return (
-    <div className="relative w-full">
+    <div className="relative w-full" style={{ width: '70%' }}>
       <div className="bg-card border border-border rounded-md w-full">
         <div className="overflow-x-auto overflow-y-hidden w-full">
           {loaded ? (
@@ -230,7 +230,7 @@ export default function WardContactImportPage() {
       try {
         jsonData = JSON.parse(fileContent);
       } catch (e) {
-        throw new Error("Invalid JSON file. Please ensure you're uploading the correct file.");
+        throw new Error("Invalid JSON file. Please ensure you're importing the correct file.");
       }
       
       // Validate basic structure (this is a simple check, enhance as needed)
@@ -363,7 +363,7 @@ export default function WardContactImportPage() {
           <InstructionStep 
             number={6} 
             title="Import the Downloaded File" 
-            description="Upload the downloaded JSON file below to import your ward's contact information."
+            description="Import the downloaded JSON file below to import your ward's contact information."
           />
         </div>
         

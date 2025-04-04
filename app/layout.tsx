@@ -16,6 +16,12 @@ export const metadata = {
   icons: {
     icon: "/images/logo.png",
   },
+  viewport: {
+    width: "device-width",
+    initialScale: 1,
+    maximumScale: 1,
+    userScalable: false,
+  }
 };
 
 const inter = Inter({
@@ -36,6 +42,9 @@ export default async function RootLayout({
   
   return (
     <html lang="en" className={inter.className} suppressHydrationWarning>
+      <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+      </head>
       <body className="bg-background text-foreground">
         <ThemeProvider
           attribute="class"

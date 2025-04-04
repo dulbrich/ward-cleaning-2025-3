@@ -262,31 +262,31 @@ export default function AuthenticatedLayout({
 
   // Main layout structure
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col overflow-x-hidden">
       {/* Top Navigation Bar */}
-      <header className="fixed top-0 left-0 right-0 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 z-50 h-[60px] md:h-[60px]">
-        <div className="flex h-full items-center px-4">
+      <header className="fixed top-0 left-0 right-0 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 z-50 h-[60px] w-full">
+        <div className="flex h-full items-center px-2 sm:px-4">
           {/* Left side: Menu toggle, Logo & Page Title */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             <Button
               variant="ghost"
               size="icon"
               className="md:hidden"
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
             >
-              <Menu size={24} />
+              <Menu size={22} />
               <span className="sr-only">Toggle menu</span>
             </Button>
 
-            <Link href="/app" className="flex items-center gap-2">
+            <Link href="/app" className="flex items-center gap-1 sm:gap-2">
               <Image 
                 src="/images/logo.png" 
                 alt="Ward Cleaning Logo" 
-                width={32} 
-                height={32}
+                width={28}
+                height={28}
                 className="rounded-md"
               />
-              <span className="font-medium text-lg hidden sm:inline-block">
+              <span className="font-medium text-base lg:text-lg hidden sm:inline-block truncate">
                 Ward Cleaning
               </span>
             </Link>
@@ -296,30 +296,30 @@ export default function AuthenticatedLayout({
           <div className="flex-1" />
 
           {/* Right side: Notification, Theme, Settings, User Profile */}
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon">
-              <Bell size={20} className="text-muted-foreground" />
+          <div className="flex items-center gap-1 sm:gap-2">
+            <Button variant="ghost" size="icon" className="h-8 w-8 sm:h-9 sm:w-9">
+              <Bell size={18} className="text-muted-foreground" />
             </Button>
             
             <ThemeSwitcher />
             
-            <Button variant="ghost" size="icon">
-              <Cog size={20} className="text-muted-foreground" />
+            <Button variant="ghost" size="icon" className="h-8 w-8 sm:h-9 sm:w-9">
+              <Cog size={18} className="text-muted-foreground" />
             </Button>
             
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" className="gap-2 px-2">
+                <Button variant="ghost" size="sm" className="gap-2 px-1 sm:px-2">
                   {profile?.avatar_url ? (
                     <Image
                       src={profile.avatar_url.startsWith('/') ? profile.avatar_url : `/images/avatars/${profile.avatar_url}`}
                       alt={`${profile.first_name} ${profile.last_name}`}
                       width={32}
                       height={32}
-                      className="h-8 w-8 rounded-full object-cover"
+                      className="h-7 w-7 sm:h-8 sm:w-8 rounded-full object-cover"
                     />
                   ) : (
-                    <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center">
+                    <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-full bg-muted flex items-center justify-center">
                       <span className="text-xs font-medium">
                         {profile ? `${profile.first_name.charAt(0)}${profile.last_name.charAt(0)}` : 'JD'}
                       </span>
@@ -438,15 +438,16 @@ export default function AuthenticatedLayout({
       {/* Main Content */}
       <main 
         className={`
-          mt-[60px] pt-6 pb-12 px-4 md:px-6
+          mt-[60px] pt-4 pb-8 sm:pt-6 sm:pb-12 px-2 sm:px-4 md:px-6
           transition-all duration-200 ease-out
+          overflow-x-hidden w-full
           ${isMobile 
             ? 'ml-0' 
             : (isSidebarExpanded ? 'ml-0 md:ml-60' : 'ml-0 md:ml-16')
           }
         `}
       >
-        <div className="mx-auto max-w-6xl">
+        <div className="w-full mx-auto max-w-full sm:max-w-3xl md:max-w-4xl lg:max-w-6xl overflow-hidden">
           {children}
         </div>
       </main>

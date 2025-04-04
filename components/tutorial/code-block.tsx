@@ -46,16 +46,16 @@ export function CodeBlock({ code }: { code: string }) {
   };
 
   return (
-    <pre className="bg-muted rounded-md p-6 my-6 relative">
+    <pre className="bg-muted rounded-md p-2 sm:p-4 md:p-6 my-4 sm:my-6 relative w-full overflow-x-auto">
       <Button
         size="icon"
         onClick={copy}
         variant={"outline"}
-        className="absolute right-2 top-2"
+        className="absolute right-1 sm:right-2 top-1 sm:top-2 h-7 w-7 sm:h-8 sm:w-8"
       >
         {icon}
       </Button>
-      <code className="text-xs p-3">{code}</code>
+      <code className="text-xs block whitespace-pre overflow-x-auto">{code}</code>
     </pre>
   );
 }
