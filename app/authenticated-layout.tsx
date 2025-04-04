@@ -10,6 +10,7 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
+import { useUserProfile } from "@/hooks/useUserProfile";
 import {
     BarChart3,
     Bell,
@@ -76,6 +77,7 @@ export default function AuthenticatedLayout({
   const [isMobile, setIsMobile] = useState(false);
   const expandTimerRef = useRef<NodeJS.Timeout | null>(null);
   const pathname = usePathname();
+  const { profile, loading } = useUserProfile();
 
   // Check screen size on component mount and window resize
   useEffect(() => {
@@ -302,16 +304,34 @@ export default function AuthenticatedLayout({
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="sm" className="gap-2 px-2">
-                  <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center">
-                    <span className="text-xs font-medium">JD</span>
-                  </div>
-                  <span className="font-medium text-sm hidden md:inline-block">John Doe</span>
+                  {profile?.avatar_url ? (
+                    <Image
+                      src={profile.avatar_url.startsWith('/') ? profile.avatar_url : `/images/avatars/${profile.avatar_url}`}
+                      alt={`${profile.first_name} ${profile.last_name}`}
+                      width={32}
+                      height={32}
+                      className="h-8 w-8 rounded-full object-cover"
+                    />
+                  ) : (
+                    <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center">
+                      <span className="text-xs font-medium">
+                        {profile ? `${profile.first_name.charAt(0)}${profile.last_name.charAt(0)}` : 'JD'}
+                      </span>
+                    </div>
+                  )}
+                  <span className="font-medium text-sm hidden md:inline-block">
+                    {profile ? `${profile.first_name} ${profile.last_name}` : 'John Doe'}
+                  </span>
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
                 <div className="flex flex-col space-y-1 p-2">
-                  <p className="text-sm font-medium">John Doe</p>
-                  <p className="text-xs text-muted-foreground">john.doe@example.com</p>
+                  <p className="text-sm font-medium">
+                    {profile ? `${profile.first_name} ${profile.last_name}` : 'John Doe'}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {profile?.username || 'john.doe@example.com'}
+                  </p>
                 </div>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>
