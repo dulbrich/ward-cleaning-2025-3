@@ -24,24 +24,24 @@ export default function ContactsPage() {
   useEffect(() => {
     // Get wardContactData from localStorage
     const wardContactDataStr = localStorage.getItem('wardContactData');
-    console.log('Raw data from localStorage:', wardContactDataStr ? 'Data exists' : 'No data');
+    //console.log('Raw data from localStorage:', wardContactDataStr ? 'Data exists' : 'No data');
     
     if (wardContactDataStr) {
       try {
         const wardData = JSON.parse(wardContactDataStr);
-        console.log('Parsed wardData structure:', wardData);
+        //console.log('Parsed wardData structure:', wardData);
         
         // Extract contacts from the data structure
         let allContacts: Contact[] = [];
         
         // The ward.json is an array of households
         if (Array.isArray(wardData)) {
-          console.log('Data is an array of households, length:', wardData.length);
+          //console.log('Data is an array of households, length:', wardData.length);
           
           // Process each household
           wardData.forEach((household: any) => {
             if (household.members && Array.isArray(household.members)) {
-              console.log(`Household ${household.name} has ${household.members.length} members`);
+              //console.log(`Household ${household.name} has ${household.members.length} members`);
               
               // Add all members from the household
               household.members.forEach((member: any) => {
@@ -68,23 +68,23 @@ export default function ContactsPage() {
             }
           });
         } else {
-          console.log('Data is not in expected array format, trying to extract data from object');
+          //console.log('Data is not in expected array format, trying to extract data from object');
           // If we somehow got a different format, try to extract data
           // ...existing fallback code
         }
         
-        console.log('All extracted contacts:', allContacts.length);
-        if (allContacts.length === 0) {
-          console.log('No contacts extracted. Raw wardData:', wardData);
-        } else {
-          console.log('Sample contact (first in list):', allContacts[0]);
-        }
+        //console.log('All extracted contacts:', allContacts.length);
+        // if (allContacts.length === 0) {
+        //   console.log('No contacts extracted. Raw wardData:', wardData);
+        // } else {
+        //   console.log('Sample contact (first in list):', allContacts[0]);
+        // }
         
         // Filter contacts: head=true and has phone
         const filteredContacts = allContacts.filter(contact => {
           const isHead = contact.head === true;
           const hasPhone = Boolean(contact.phone && contact.phone.trim() !== '');
-          console.log(`Contact ${contact.name || 'unknown'}: isHead=${isHead}, hasPhone=${hasPhone}`);
+          //console.log(`Contact ${contact.name || 'unknown'}: isHead=${isHead}, hasPhone=${hasPhone}`);
           return isHead && hasPhone;
         });
         
@@ -256,7 +256,8 @@ export default function ContactsPage() {
       </div>
       
       <div className="bg-card rounded-lg border overflow-hidden">
-        <div className="p-4 border-b bg-muted">
+        {/* Header - hide on mobile */}
+        <div className="p-4 border-b bg-muted hidden md:block">
           <div className="grid grid-cols-12 font-medium">
             <div className="col-span-5">Name</div>
             <div className="col-span-3">Role</div>
@@ -269,7 +270,8 @@ export default function ContactsPage() {
           {filteredContacts.length > 0 ? (
             filteredContacts.map((contact, index) => (
               <div key={index} className="p-4 hover:bg-muted/50">
-                <div className="grid grid-cols-12 items-center">
+                {/* Desktop layout - hidden on mobile */}
+                <div className="hidden md:grid grid-cols-12 items-center">
                   <div className="col-span-5 flex items-center gap-3">
                     <div className={`w-10 h-10 rounded-full bg-${getRandomColor(contact.name)}-100 flex items-center justify-center`}>
                       <span className={`text-${getRandomColor(contact.name)}-700 font-medium`}>
@@ -285,6 +287,47 @@ export default function ContactsPage() {
                   <div className="col-span-3">{contact.phone || ""}</div>
                   <div className="col-span-1 text-right">
                     <button className="text-primary hover:underline text-sm">View</button>
+                  </div>
+                </div>
+                
+                {/* Mobile layout - shown only on small screens */}
+                <div className="md:hidden flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-10 h-10 rounded-full bg-${getRandomColor(contact.name)}-100 flex items-center justify-center`}>
+                      <span className={`text-${getRandomColor(contact.name)}-700 font-medium`}>
+                        {getInitials(contact.name)}
+                      </span>
+                    </div>
+                    <div>
+                      <h3 className="font-medium">
+                        {contact.name ? 
+                          (() => {
+                            const nameParts = contact.name.split(' ');
+                            // Get first name and last name only
+                            return nameParts.length > 1 ? 
+                              `${nameParts[0]} ${nameParts[nameParts.length - 1]}` : 
+                              contact.name;
+                          })() : 
+                          "Unknown"}
+                      </h3>
+                      {contact.role && contact.role !== "Member" && (
+                        <p className="text-xs text-muted-foreground truncate max-w-[150px]">
+                          {contact.role.length > 20 ? 
+                            contact.role.split(' ').slice(0, 2).join(' ') + '...' : 
+                            contact.role}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="text-sm text-right">
+                      {contact.phone}
+                    </div>
+                    <a href={`tel:${contact.phone?.replace(/\D/g, '')}`} className="text-primary">
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+                        <path fillRule="evenodd" d="M1.5 4.5a3 3 0 013-3h1.372c.86 0 1.61.586 1.819 1.42l1.105 4.423a1.875 1.875 0 01-.694 1.955l-1.293.97c-.135.101-.164.249-.126.352a11.285 11.285 0 006.697 6.697c.103.038.25.009.352-.126l.97-1.293a1.875 1.875 0 011.955-.694l4.423 1.105c.834.209 1.42.959 1.42 1.82V19.5a3 3 0 01-3 3h-2.25C8.552 22.5 1.5 15.448 1.5 6.75V4.5z" clipRule="evenodd" />
+                      </svg>
+                    </a>
                   </div>
                 </div>
               </div>
