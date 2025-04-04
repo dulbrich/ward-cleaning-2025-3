@@ -438,16 +438,18 @@ export default function AuthenticatedLayout({
       {/* Main Content */}
       <main 
         className={`
-          mt-[60px] pt-4 pb-8 sm:pt-6 sm:pb-12 px-2 sm:px-4 md:px-6
+          mt-[60px] pt-4 pb-8 sm:pt-6 sm:pb-12
           transition-all duration-200 ease-out
-          overflow-x-hidden w-full
+          overflow-x-hidden w-full flex justify-center
           ${isMobile 
-            ? 'ml-0' 
-            : (isSidebarExpanded ? 'ml-0 md:ml-60' : 'ml-0 md:ml-16')
+            ? 'px-3 sm:px-4' 
+            : (isSidebarExpanded || isHovering 
+                ? 'md:pl-64 px-4 md:pr-6' 
+                : 'md:pl-20 px-4 md:pr-6')
           }
         `}
       >
-        <div className="w-full mx-auto max-w-full sm:max-w-3xl md:max-w-4xl lg:max-w-6xl overflow-hidden">
+        <div className="w-full max-w-5xl">
           {children}
         </div>
       </main>

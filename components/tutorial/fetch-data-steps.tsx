@@ -46,9 +46,9 @@ export default function Page() {
 
 export default function FetchDataSteps() {
   return (
-    <ol className="flex flex-col gap-6 w-full">
+    <ol className="flex flex-col gap-6">
       <TutorialStep title="Create some tables and insert some data">
-        <p className="break-words">
+        <p>
           Head over to the{" "}
           <a
             href="https://supabase.com/dashboard/project/_/editor"
@@ -71,13 +71,11 @@ export default function FetchDataSteps() {
           </a>{" "}
           and click RUN!
         </p>
-        <div className="w-full overflow-x-auto">
-          <CodeBlock code={create} />
-        </div>
+        <CodeBlock code={create} />
       </TutorialStep>
 
       <TutorialStep title="Query Supabase data from Next.js">
-        <p className="break-words">
+        <p>
           To create a Supabase client and query data from an Async Server
           Component, create a new page.tsx file at{" "}
           <span className="relative rounded bg-muted px-[0.3rem] py-[0.2rem] font-mono text-xs font-medium text-secondary-foreground border">
@@ -85,17 +83,13 @@ export default function FetchDataSteps() {
           </span>{" "}
           and add the following.
         </p>
-        <div className="w-full overflow-x-auto">
-          <CodeBlock code={server} />
-        </div>
-        <p className="break-words">Alternatively, you can use a Client Component.</p>
-        <div className="w-full overflow-x-auto">
-          <CodeBlock code={client} />
-        </div>
+        <CodeBlock code={server} />
+        <p>Alternatively, you can use a Client Component.</p>
+        <CodeBlock code={client} />
       </TutorialStep>
 
       <TutorialStep title="Build in a weekend and scale to millions!">
-        <p className="break-words">You're ready to launch your product to the world! 🚀</p>
+        <p>You're ready to launch your product to the world! 🚀</p>
       </TutorialStep>
     </ol>
   );
