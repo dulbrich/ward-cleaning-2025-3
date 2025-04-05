@@ -1,6 +1,7 @@
 import { createClient } from "@/utils/supabase/server";
 import { ThemeProvider } from "next-themes";
 import { Inter } from "next/font/google";
+import { Toaster } from "sonner";
 import AuthenticatedLayout from "./authenticated-layout";
 import "./globals.css";
 import UnauthenticatedLayout from "./unauthenticated-layout";
@@ -54,6 +55,7 @@ export default async function RootLayout({
         >
           {isAuthenticated && <AuthenticatedLayout>{children}</AuthenticatedLayout>}
           {!isAuthenticated && <UnauthenticatedLayout>{children}</UnauthenticatedLayout>}
+          <Toaster richColors position="top-center" />
         </ThemeProvider>
       </body>
     </html>

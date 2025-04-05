@@ -2,47 +2,34 @@
 
 import Fuse from 'fuse.js';
 import { useEffect, useState } from 'react';
-
-interface Contact {
-  name?: string;
-  email?: string;
-  phone?: string;
-  role?: string;
-  head?: boolean | string;
-  isHead?: boolean | string;
-  headOfHousehold?: boolean | string;
-  householdRole?: string;
-  // Add other properties as needed
-}
+import { toast } from 'sonner';
+import { Contact, checkDoNotContactStatus, toggleDoNotContactStatus } from './actions';
 
 export default function ContactsPage() {
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [filteredContacts, setFilteredContacts] = useState<Contact[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [fuse, setFuse] = useState<Fuse<Contact> | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [processingContact, setProcessingContact] = useState<string | null>(null);
 
   useEffect(() => {
     // Get wardContactData from localStorage
     const wardContactDataStr = localStorage.getItem('wardContactData');
-    //console.log('Raw data from localStorage:', wardContactDataStr ? 'Data exists' : 'No data');
     
     if (wardContactDataStr) {
       try {
+        setLoading(true);
         const wardData = JSON.parse(wardContactDataStr);
-        //console.log('Parsed wardData structure:', wardData);
         
         // Extract contacts from the data structure
         let allContacts: Contact[] = [];
         
         // The ward.json is an array of households
         if (Array.isArray(wardData)) {
-          //console.log('Data is an array of households, length:', wardData.length);
-          
           // Process each household
           wardData.forEach((household: any) => {
             if (household.members && Array.isArray(household.members)) {
-              //console.log(`Household ${household.name} has ${household.members.length} members`);
-              
               // Add all members from the household
               household.members.forEach((member: any) => {
                 // Extract phone number
@@ -68,27 +55,16 @@ export default function ContactsPage() {
             }
           });
         } else {
-          //console.log('Data is not in expected array format, trying to extract data from object');
           // If we somehow got a different format, try to extract data
           // ...existing fallback code
         }
-        
-        //console.log('All extracted contacts:', allContacts.length);
-        // if (allContacts.length === 0) {
-        //   console.log('No contacts extracted. Raw wardData:', wardData);
-        // } else {
-        //   console.log('Sample contact (first in list):', allContacts[0]);
-        // }
         
         // Filter contacts: head=true and has phone
         const filteredContacts = allContacts.filter(contact => {
           const isHead = contact.head === true;
           const hasPhone = Boolean(contact.phone && contact.phone.trim() !== '');
-          //console.log(`Contact ${contact.name || 'unknown'}: isHead=${isHead}, hasPhone=${hasPhone}`);
           return isHead && hasPhone;
         });
-        
-        console.log('Filtered contacts count:', filteredContacts.length);
         
         // Format phone numbers and sort by name
         let formattedContacts = filteredContacts.map(contact => {
@@ -136,8 +112,6 @@ export default function ContactsPage() {
             contact.phone && contact.phone.trim() !== ''
           );
           
-          console.log('Contacts with phones (fallback):', contactsWithPhones.length);
-          
           formattedContacts = contactsWithPhones.map(contact => {
             // Format phone to +1 (###) ###-####
             let formattedPhone = contact.phone || '';
@@ -175,19 +149,31 @@ export default function ContactsPage() {
           });
         }
         
-        setContacts(formattedContacts);
-        setFilteredContacts(formattedContacts);
-        
-        // Initialize Fuse.js with the contacts
-        const fuseOptions = {
-          keys: ['name', 'email', 'phone', 'role'],
-          threshold: 0.3, // A lower threshold means a more strict match
-          includeScore: true
-        };
-        setFuse(new Fuse(formattedContacts, fuseOptions));
+        // Check do-not-contact status for all contacts
+        checkDoNotContactStatus(formattedContacts)
+          .then(enhancedContacts => {
+            setContacts(enhancedContacts);
+            setFilteredContacts(enhancedContacts);
+            
+            // Initialize Fuse.js with the contacts
+            const fuseOptions = {
+              keys: ['name', 'email', 'phone', 'role'],
+              threshold: 0.3, // A lower threshold means a more strict match
+              includeScore: true
+            };
+            setFuse(new Fuse(enhancedContacts, fuseOptions));
+            setLoading(false);
+          })
+          .catch(error => {
+            console.error("Error checking do-not-contact status:", error);
+            setContacts(formattedContacts);
+            setFilteredContacts(formattedContacts);
+            setLoading(false);
+          });
         
       } catch (error) {
         console.error("Error parsing wardContactData:", error);
+        setLoading(false);
       }
     }
   }, []);
@@ -220,8 +206,77 @@ export default function ContactsPage() {
     return colors[index];
   };
   
+  const getShortName = (name?: string) => {
+    if (!name) return "Unknown";
+    const nameParts = name.split(' ');
+    // Get first name and last name only
+    return nameParts.length > 1 ? 
+      `${nameParts[0]} ${nameParts[nameParts.length - 1]}` : 
+      name;
+  };
+  
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(e.target.value);
+  };
+
+  const handleToggleDoNotContact = async (contact: Contact) => {
+    if (!contact.name || !contact.phone || !contact.userHash) {
+      toast.error("Cannot update contact: Missing required information");
+      return;
+    }
+    
+    setProcessingContact(contact.userHash);
+    
+    try {
+      const newStatus = !contact.doNotContact;
+      
+      const result = await toggleDoNotContactStatus(contact, newStatus);
+      
+      if (result.success) {
+        // Update the contact in the local state
+        const updatedContacts = contacts.map(c => 
+          c.userHash === contact.userHash 
+            ? { ...c, doNotContact: newStatus } 
+            : c
+        );
+        
+        setContacts(updatedContacts);
+        
+        // Update filtered contacts as well
+        const updatedFilteredContacts = filteredContacts.map(c => 
+          c.userHash === contact.userHash 
+            ? { ...c, doNotContact: newStatus } 
+            : c
+        );
+        
+        setFilteredContacts(updatedFilteredContacts);
+        
+        toast.success(newStatus 
+          ? "Contact marked as 'Do Not Contact'" 
+          : "Contact removed from 'Do Not Contact' list"
+        );
+      } else {
+        toast.error(`Error: ${result.message}`);
+      }
+    } catch (error) {
+      console.error("Error toggling do-not-contact status:", error);
+      toast.error("An unexpected error occurred");
+    } finally {
+      setProcessingContact(null);
+    }
+  };
+
+  const getUserTypeBadge = (userType?: string) => {
+    if (!userType || userType === 'unknown') return null;
+    
+    const bgColor = userType === 'imported' ? 'bg-blue-100 dark:bg-blue-900' : 'bg-green-100 dark:bg-green-900';
+    const textColor = userType === 'imported' ? 'text-blue-800 dark:text-blue-300' : 'text-green-800 dark:text-green-300';
+    
+    return (
+      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium mr-8 ${bgColor} ${textColor}`}>
+        {userType === 'imported' ? 'Imported' : 'Registered'}
+      </span>
+    );
   };
 
   return (
@@ -255,96 +310,202 @@ export default function ContactsPage() {
         </div>
       </div>
       
-      <div className="bg-card rounded-lg border overflow-hidden">
-        {/* Header - hide on mobile */}
-        <div className="p-4 border-b bg-muted hidden md:block">
-          <div className="grid grid-cols-12 font-medium">
-            <div className="col-span-5">Name</div>
-            <div className="col-span-3">Role</div>
-            <div className="col-span-3">Contact</div>
-            <div className="col-span-1"></div>
+      {loading ? (
+        <div className="flex justify-center items-center p-8">
+          <svg 
+            className="animate-spin h-8 w-8 text-primary" 
+            xmlns="http://www.w3.org/2000/svg" 
+            fill="none" 
+            viewBox="0 0 24 24"
+          >
+            <circle 
+              className="opacity-25" 
+              cx="12" 
+              cy="12" 
+              r="10" 
+              stroke="currentColor" 
+              strokeWidth="4"
+            ></circle>
+            <path 
+              className="opacity-75" 
+              fill="currentColor" 
+              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+            ></path>
+          </svg>
+          <span className="ml-3 text-lg">Loading contacts...</span>
+        </div>
+      ) : (
+        <div className="bg-card rounded-lg border overflow-hidden shadow-sm dark:shadow-gray-800/30">
+          {/* Header - hide on mobile */}
+          <div className="p-4 border-b bg-muted hidden md:block">
+            <div className="grid grid-cols-12 font-medium">
+              <div className="col-span-5">Name</div>
+              <div className="col-span-3">Role</div>
+              <div className="col-span-3">Contact</div>
+              <div className="col-span-1">Do Not Contact</div>
+            </div>
+          </div>
+          
+          <div className="divide-y">
+            {filteredContacts.length > 0 ? (
+              filteredContacts.map((contact, index) => (
+                <div 
+                  key={index} 
+                  className={`p-4 ${
+                    contact.doNotContact 
+                      ? 'bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/30' 
+                      : 'hover:bg-muted/50'
+                  }`}
+                >
+                  {/* Desktop layout - hidden on mobile */}
+                  <div className="hidden md:grid grid-cols-12 items-center">
+                    <div className="col-span-5 flex items-center gap-3">
+                      <div className={`w-10 h-10 rounded-full bg-${getRandomColor(contact.name)}-100 dark:bg-${getRandomColor(contact.name)}-900/30 flex items-center justify-center flex-shrink-0`}>
+                        <span className={`text-${getRandomColor(contact.name)}-700 dark:text-${getRandomColor(contact.name)}-300 font-medium`}>
+                          {getInitials(contact.name)}
+                        </span>
+                      </div>
+                      <div className="flex-grow min-w-0">
+                        <div className="flex justify-between items-center">
+                          <h3 className="font-medium truncate mr-2">{getShortName(contact.name)}</h3>
+                          {getUserTypeBadge(contact.userType)}
+                        </div>
+                        <p className="text-xs text-muted-foreground truncate">{contact.email || ""}</p>
+                      </div>
+                    </div>
+                    <div className="col-span-3 truncate">{contact.role || "Member"}</div>
+                    <div className="col-span-3 truncate">{contact.phone || ""}</div>
+                    <div className="col-span-1 text-right">
+                      <button 
+                        className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 ${
+                          contact.doNotContact ? 'bg-red-500' : 'bg-gray-200 dark:bg-gray-700'
+                        }`}
+                        role="switch"
+                        aria-checked={contact.doNotContact}
+                        disabled={processingContact === contact.userHash}
+                        onClick={() => handleToggleDoNotContact(contact)}
+                      >
+                        <span 
+                          className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                            contact.doNotContact ? 'translate-x-5' : 'translate-x-0'
+                          }`} 
+                        />
+                        {processingContact === contact.userHash && (
+                          <span className="absolute inset-0 flex items-center justify-center">
+                            <svg 
+                              className="h-3 w-3 text-white animate-spin" 
+                              xmlns="http://www.w3.org/2000/svg" 
+                              fill="none" 
+                              viewBox="0 0 24 24"
+                            >
+                              <circle 
+                                className="opacity-25" 
+                                cx="12" 
+                                cy="12" 
+                                r="10" 
+                                stroke="currentColor" 
+                                strokeWidth="4"
+                              ></circle>
+                              <path 
+                                className="opacity-75" 
+                                fill="currentColor" 
+                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                              ></path>
+                            </svg>
+                          </span>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                  
+                  {/* Mobile layout - shown only on small screens */}
+                  <div className="md:hidden flex items-center justify-between">
+                    <div className="flex items-center gap-3 flex-grow">
+                      <div className={`w-10 h-10 rounded-full bg-${getRandomColor(contact.name)}-100 dark:bg-${getRandomColor(contact.name)}-900/30 flex items-center justify-center flex-shrink-0`}>
+                        <span className={`text-${getRandomColor(contact.name)}-700 dark:text-${getRandomColor(contact.name)}-300 font-medium`}>
+                          {getInitials(contact.name)}
+                        </span>
+                      </div>
+                      <div className="min-w-0 flex-grow">
+                        <div className="flex justify-between items-center">
+                          <h3 className="font-medium truncate mr-2">
+                            {getShortName(contact.name)}
+                          </h3>
+                          {getUserTypeBadge(contact.userType)}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {contact.role && contact.role !== "Member" && (
+                            <p className="text-xs text-muted-foreground truncate max-w-[150px]">
+                              {contact.role.length > 20 ? 
+                                contact.role.split(' ').slice(0, 2).join(' ') + '...' : 
+                                contact.role}
+                            </p>
+                          )}
+                          {contact.doNotContact && (
+                            <span className="px-1.5 py-0.5 text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300 rounded">
+                              Do Not Contact
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3 flex-shrink-0 ml-2">
+                      <div className="text-sm text-right">
+                        {contact.phone}
+                      </div>
+                      <button 
+                        className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 ${
+                          contact.doNotContact ? 'bg-red-500' : 'bg-gray-200 dark:bg-gray-700'
+                        }`}
+                        role="switch"
+                        aria-checked={contact.doNotContact}
+                        disabled={processingContact === contact.userHash}
+                        onClick={() => handleToggleDoNotContact(contact)}
+                      >
+                        <span 
+                          className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                            contact.doNotContact ? 'translate-x-5' : 'translate-x-0'
+                          }`} 
+                        />
+                        {processingContact === contact.userHash && (
+                          <span className="absolute inset-0 flex items-center justify-center">
+                            <svg 
+                              className="h-3 w-3 text-white animate-spin" 
+                              xmlns="http://www.w3.org/2000/svg" 
+                              fill="none" 
+                              viewBox="0 0 24 24"
+                            >
+                              <circle 
+                                className="opacity-25" 
+                                cx="12" 
+                                cy="12" 
+                                r="10" 
+                                stroke="currentColor" 
+                                strokeWidth="4"
+                              ></circle>
+                              <path 
+                                className="opacity-75" 
+                                fill="currentColor" 
+                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                              ></path>
+                            </svg>
+                          </span>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="p-8 text-center text-muted-foreground">
+                {searchQuery 
+                  ? `No contacts found matching "${searchQuery}". Try a different search term.` 
+                  : "No contacts found that match the criteria. Make sure you have imported your ward data."}
+              </div>
+            )}
           </div>
         </div>
-        
-        <div className="divide-y">
-          {filteredContacts.length > 0 ? (
-            filteredContacts.map((contact, index) => (
-              <div key={index} className="p-4 hover:bg-muted/50">
-                {/* Desktop layout - hidden on mobile */}
-                <div className="hidden md:grid grid-cols-12 items-center">
-                  <div className="col-span-5 flex items-center gap-3">
-                    <div className={`w-10 h-10 rounded-full bg-${getRandomColor(contact.name)}-100 flex items-center justify-center`}>
-                      <span className={`text-${getRandomColor(contact.name)}-700 font-medium`}>
-                        {getInitials(contact.name)}
-                      </span>
-                    </div>
-                    <div>
-                      <h3 className="font-medium">{contact.name || "Unknown"}</h3>
-                      <p className="text-xs text-muted-foreground">{contact.email || ""}</p>
-                    </div>
-                  </div>
-                  <div className="col-span-3">{contact.role || "Member"}</div>
-                  <div className="col-span-3">{contact.phone || ""}</div>
-                  <div className="col-span-1 text-right">
-                    <button className="text-red-500 hover:text-red-600 text-sm">
-                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
-                  </div>
-                </div>
-                
-                {/* Mobile layout - shown only on small screens */}
-                <div className="md:hidden flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-10 h-10 rounded-full bg-${getRandomColor(contact.name)}-100 flex items-center justify-center`}>
-                      <span className={`text-${getRandomColor(contact.name)}-700 font-medium`}>
-                        {getInitials(contact.name)}
-                      </span>
-                    </div>
-                    <div>
-                      <h3 className="font-medium">
-                        {contact.name ? 
-                          (() => {
-                            const nameParts = contact.name.split(' ');
-                            // Get first name and last name only
-                            return nameParts.length > 1 ? 
-                              `${nameParts[0]} ${nameParts[nameParts.length - 1]}` : 
-                              contact.name;
-                          })() : 
-                          "Unknown"}
-                      </h3>
-                      {contact.role && contact.role !== "Member" && (
-                        <p className="text-xs text-muted-foreground truncate max-w-[150px]">
-                          {contact.role.length > 20 ? 
-                            contact.role.split(' ').slice(0, 2).join(' ') + '...' : 
-                            contact.role}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className="text-sm text-right">
-                      {contact.phone}
-                    </div>
-                    <button className="text-red-500">
-                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))
-          ) : (
-            <div className="p-8 text-center text-muted-foreground">
-              {searchQuery 
-                ? `No contacts found matching "${searchQuery}". Try a different search term.` 
-                : "No contacts found that match the criteria. Make sure you have imported your ward data."}
-            </div>
-          )}
-        </div>
-      </div>
+      )}
     </div>
   );
 } 
