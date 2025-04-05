@@ -12,6 +12,17 @@ export default function ContactsPage() {
   const [fuse, setFuse] = useState<Fuse<Contact> | null>(null);
   const [loading, setLoading] = useState(false);
   const [processingContact, setProcessingContact] = useState<string | null>(null);
+  const [swipeState, setSwipeState] = useState<{
+    contactHash: string | null;
+    startX: number;
+    currentX: number;
+    swiping: boolean;
+  }>({
+    contactHash: null,
+    startX: 0,
+    currentX: 0,
+    swiping: false
+  });
 
   useEffect(() => {
     // Get wardContactData from localStorage
@@ -152,8 +163,9 @@ export default function ContactsPage() {
         // Check do-not-contact status for all contacts
         checkDoNotContactStatus(formattedContacts)
           .then(enhancedContacts => {
-            setContacts(enhancedContacts);
-            setFilteredContacts(enhancedContacts);
+            // Save the contacts with their statuses
+            setContacts([...enhancedContacts]);
+            setFilteredContacts([...enhancedContacts]);
             
             // Initialize Fuse.js with the contacts
             const fuseOptions = {
@@ -220,46 +232,89 @@ export default function ContactsPage() {
   };
 
   const handleToggleDoNotContact = async (contact: Contact) => {
+    // Skip registered users
+    if (contact.userType === 'registered') {
+      toast.info("Registered users manage their own contact preferences");
+      return;
+    }
+
     if (!contact.name || !contact.phone || !contact.userHash) {
       toast.error("Cannot update contact: Missing required information");
       return;
     }
     
+    const newStatus = !contact.doNotContact;
+    console.log(`Toggling ${contact.name} to do-not-contact: ${newStatus}`);
+    
     setProcessingContact(contact.userHash);
     
     try {
-      const newStatus = !contact.doNotContact;
-      
+      // This only sends the hash to the database, not name or phone details
       const result = await toggleDoNotContactStatus(contact, newStatus);
       
       if (result.success) {
-        // Update the contact in the local state
-        const updatedContacts = contacts.map(c => 
-          c.userHash === contact.userHash 
-            ? { ...c, doNotContact: newStatus } 
-            : c
-        );
+        console.log(`Server update successful for ${contact.name}, updating UI state`);
         
-        setContacts(updatedContacts);
+        // Create completely new contact objects to force React re-render
+        const updatedContacts = contacts.map(c => {
+          if (c.userHash === contact.userHash) {
+            console.log(`Found matching contact to update: ${c.name}, setting doNotContact to ${newStatus}`);
+            // Create a completely new object
+            return {
+              ...c,
+              doNotContact: newStatus,
+              // Add a timestamp to force React to see this as a new object
+              _updated: Date.now()
+            };
+          }
+          return c;
+        });
         
-        // Update filtered contacts as well
-        const updatedFilteredContacts = filteredContacts.map(c => 
-          c.userHash === contact.userHash 
-            ? { ...c, doNotContact: newStatus } 
-            : c
-        );
+        // Update filtered contacts the same way
+        const updatedFilteredContacts = filteredContacts.map(c => {
+          if (c.userHash === contact.userHash) {
+            return {
+              ...c,
+              doNotContact: newStatus,
+              _updated: Date.now()
+            };
+          }
+          return c;
+        });
         
-        setFilteredContacts(updatedFilteredContacts);
+        // First reset state, then set the new state after a tiny delay
+        // This helps React recognize the change
+        setContacts([]);
+        setFilteredContacts([]);
         
-        toast.success(newStatus 
-          ? "Contact marked as 'Do Not Contact'" 
-          : "Contact removed from 'Do Not Contact' list"
-        );
+        // Use setTimeout to ensure the component actually sees this as two separate updates
+        setTimeout(() => {
+          setContacts([...updatedContacts]);
+          setFilteredContacts([...updatedFilteredContacts]);
+          
+          // Re-initialize fuse with updated data
+          if (fuse) {
+            const fuseOptions = {
+              keys: ['name', 'email', 'phone', 'role'],
+              threshold: 0.3,
+              includeScore: true
+            };
+            setFuse(new Fuse(updatedContacts, fuseOptions));
+          }
+          
+          const successMessage = newStatus 
+            ? `Contact ${contact.name} marked as 'Do Not Contact'` 
+            : `Contact ${contact.name} removed from 'Do Not Contact' list`;
+          
+          console.log(successMessage);
+          toast.success(successMessage);
+        }, 10);
       } else {
+        console.error(`Error toggling do-not-contact for ${contact.name}:`, result.message);
         toast.error(`Error: ${result.message}`);
       }
     } catch (error) {
-      console.error("Error toggling do-not-contact status:", error);
+      console.error(`Error toggling do-not-contact status for ${contact.name}:`, error);
       toast.error("An unexpected error occurred");
     } finally {
       setProcessingContact(null);
@@ -278,6 +333,59 @@ export default function ContactsPage() {
       </span>
     );
   };
+
+  // Add touch event handlers for swipe functionality
+  const handleTouchStart = (e: React.TouchEvent, contactHash: string) => {
+    setSwipeState({
+      contactHash,
+      startX: e.touches[0].clientX,
+      currentX: e.touches[0].clientX,
+      swiping: true
+    });
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!swipeState.swiping) return;
+    
+    setSwipeState(prev => ({
+      ...prev,
+      currentX: e.touches[0].clientX
+    }));
+  };
+
+  const handleTouchEnd = (contact: Contact) => {
+    if (!swipeState.swiping || swipeState.contactHash !== contact.userHash) return;
+    
+    const swipeDistance = swipeState.startX - swipeState.currentX;
+    
+    // If swipe distance is significant (more than 50px) and user is not registered
+    if (swipeDistance > 50 && contact.userType !== 'registered') {
+      handleToggleDoNotContact(contact);
+    }
+    
+    // Reset swipe state
+    setSwipeState({
+      contactHash: null,
+      startX: 0,
+      currentX: 0,
+      swiping: false
+    });
+  };
+
+  // Add CSS variables at the top of the component, just after useState declarations
+  useEffect(() => {
+    // Set CSS variables for the background colors
+    document.documentElement.style.setProperty('--bg-registered-mobile', 'rgba(34, 197, 94, 0.08)');
+    document.documentElement.style.setProperty('--bg-do-not-contact-mobile', 'rgba(239, 68, 68, 0.08)');
+    document.documentElement.style.setProperty('--bg-default-mobile', 'transparent');
+    
+    return () => {
+      // Clean up when component unmounts
+      document.documentElement.style.removeProperty('--bg-registered-mobile');
+      document.documentElement.style.removeProperty('--bg-do-not-contact-mobile');
+      document.documentElement.style.removeProperty('--bg-default-mobile');
+    };
+  }, []);
 
   return (
     <div className="space-y-6">
@@ -350,7 +458,7 @@ export default function ContactsPage() {
             {filteredContacts.length > 0 ? (
               filteredContacts.map((contact, index) => (
                 <div 
-                  key={index} 
+                  key={`${contact.userHash}-${index}`}
                   className={`p-4 ${
                     contact.doNotContact 
                       ? 'bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/30' 
@@ -376,50 +484,75 @@ export default function ContactsPage() {
                     <div className="col-span-3 truncate">{contact.role || "Member"}</div>
                     <div className="col-span-3 truncate">{contact.phone || ""}</div>
                     <div className="col-span-1 text-right">
-                      <button 
-                        className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 ${
-                          contact.doNotContact ? 'bg-red-500' : 'bg-gray-200 dark:bg-gray-700'
-                        }`}
-                        role="switch"
-                        aria-checked={contact.doNotContact}
-                        disabled={processingContact === contact.userHash}
-                        onClick={() => handleToggleDoNotContact(contact)}
-                      >
-                        <span 
-                          className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                            contact.doNotContact ? 'translate-x-5' : 'translate-x-0'
-                          }`} 
-                        />
-                        {processingContact === contact.userHash && (
-                          <span className="absolute inset-0 flex items-center justify-center">
-                            <svg 
-                              className="h-3 w-3 text-white animate-spin" 
-                              xmlns="http://www.w3.org/2000/svg" 
-                              fill="none" 
-                              viewBox="0 0 24 24"
-                            >
-                              <circle 
-                                className="opacity-25" 
-                                cx="12" 
-                                cy="12" 
-                                r="10" 
-                                stroke="currentColor" 
-                                strokeWidth="4"
-                              ></circle>
-                              <path 
-                                className="opacity-75" 
-                                fill="currentColor" 
-                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                              ></path>
-                            </svg>
-                          </span>
-                        )}
-                      </button>
+                      {contact.userType === 'registered' ? (
+                        <span className="text-xs text-muted-foreground italic">Self-managed</span>
+                      ) : (
+                        <button 
+                          className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 ${
+                            contact.doNotContact ? 'bg-red-500' : 'bg-gray-200 dark:bg-gray-700'
+                          }`}
+                          role="switch"
+                          aria-checked={contact.doNotContact}
+                          aria-label={`Mark ${contact.name} as ${contact.doNotContact ? 'contactable' : 'do not contact'}`}
+                          disabled={processingContact === contact.userHash}
+                          onClick={(e) => {
+                            e.preventDefault(); // Prevent any form submission
+                            e.stopPropagation(); // Prevent event bubbling
+                            handleToggleDoNotContact(contact);
+                          }}
+                        >
+                          <span 
+                            className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                              contact.doNotContact ? 'translate-x-5' : 'translate-x-0'
+                            }`} 
+                          />
+                          {processingContact === contact.userHash && (
+                            <span className="absolute inset-0 flex items-center justify-center">
+                              <svg 
+                                className="h-3 w-3 text-white animate-spin" 
+                                xmlns="http://www.w3.org/2000/svg" 
+                                fill="none" 
+                                viewBox="0 0 24 24"
+                              >
+                                <circle 
+                                  className="opacity-25" 
+                                  cx="12" 
+                                  cy="12" 
+                                  r="10" 
+                                  stroke="currentColor" 
+                                  strokeWidth="4"
+                                ></circle>
+                                <path 
+                                  className="opacity-75" 
+                                  fill="currentColor" 
+                                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                                ></path>
+                              </svg>
+                            </span>
+                          )}
+                        </button>
+                      )}
                     </div>
                   </div>
                   
                   {/* Mobile layout - shown only on small screens */}
-                  <div className="md:hidden flex items-center justify-between">
+                  <div 
+                    className="md:hidden flex items-center justify-between"
+                    onTouchStart={(e) => handleTouchStart(e, contact.userHash || '')}
+                    onTouchMove={handleTouchMove}
+                    onTouchEnd={() => handleTouchEnd(contact)}
+                    style={{
+                      transform: swipeState.contactHash === contact.userHash ? 
+                        `translateX(${Math.min(0, swipeState.startX - swipeState.currentX)}px)` : 
+                        'translateX(0)',
+                      transition: swipeState.swiping ? 'none' : 'transform 0.3s ease-out',
+                      background: contact.userType === 'registered' ? 
+                        'var(--bg-registered-mobile)' : 
+                        contact.doNotContact ? 
+                          'var(--bg-do-not-contact-mobile)' : 
+                          'var(--bg-default-mobile)'
+                    }}
+                  >
                     <div className="flex items-center gap-3 flex-grow">
                       <div className={`w-10 h-10 rounded-full bg-${getRandomColor(contact.name)}-100 dark:bg-${getRandomColor(contact.name)}-900/30 flex items-center justify-center flex-shrink-0`}>
                         <span className={`text-${getRandomColor(contact.name)}-700 dark:text-${getRandomColor(contact.name)}-300 font-medium`}>
@@ -431,7 +564,6 @@ export default function ContactsPage() {
                           <h3 className="font-medium truncate mr-2">
                             {getShortName(contact.name)}
                           </h3>
-                          {getUserTypeBadge(contact.userType)}
                         </div>
                         <div className="flex items-center gap-2">
                           {contact.role && contact.role !== "Member" && (
@@ -441,57 +573,16 @@ export default function ContactsPage() {
                                 contact.role}
                             </p>
                           )}
-                          {contact.doNotContact && (
-                            <span className="px-1.5 py-0.5 text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300 rounded">
-                              Do Not Contact
-                            </span>
-                          )}
                         </div>
                       </div>
                     </div>
                     <div className="flex items-center gap-3 flex-shrink-0 ml-2">
-                      <div className="text-sm text-right">
+                      <div className="text-sm text-right whitespace-nowrap">
                         {contact.phone}
                       </div>
-                      <button 
-                        className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 ${
-                          contact.doNotContact ? 'bg-red-500' : 'bg-gray-200 dark:bg-gray-700'
-                        }`}
-                        role="switch"
-                        aria-checked={contact.doNotContact}
-                        disabled={processingContact === contact.userHash}
-                        onClick={() => handleToggleDoNotContact(contact)}
-                      >
-                        <span 
-                          className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                            contact.doNotContact ? 'translate-x-5' : 'translate-x-0'
-                          }`} 
-                        />
-                        {processingContact === contact.userHash && (
-                          <span className="absolute inset-0 flex items-center justify-center">
-                            <svg 
-                              className="h-3 w-3 text-white animate-spin" 
-                              xmlns="http://www.w3.org/2000/svg" 
-                              fill="none" 
-                              viewBox="0 0 24 24"
-                            >
-                              <circle 
-                                className="opacity-25" 
-                                cx="12" 
-                                cy="12" 
-                                r="10" 
-                                stroke="currentColor" 
-                                strokeWidth="4"
-                              ></circle>
-                              <path 
-                                className="opacity-75" 
-                                fill="currentColor" 
-                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                              ></path>
-                            </svg>
-                          </span>
-                        )}
-                      </button>
+                      {contact.userType === 'registered' && (
+                        <div className="w-3.5 h-3.5 rounded-full bg-green-500 dark:bg-green-400 ml-1"></div>
+                      )}
                     </div>
                   </div>
                 </div>

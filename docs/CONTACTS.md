@@ -8,7 +8,7 @@ This document specifies enhancements to the Contacts page to enable users to mar
 - Allow users to mark/unmark individuals as "do not contact"
 - Clearly indicate which members should not be contacted
 - Distinguish between imported users and registered users
-- Store "do not contact" preferences in the database
+- Store "do not contact" preferences in the database using anonymous hashing
 - Maintain mobile-friendly UI consistent with existing design
 
 ## User Types Display
@@ -25,11 +25,8 @@ Create a new `do_not_contact` table in the Supabase database:
 CREATE TABLE IF NOT EXISTS do_not_contact (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_hash TEXT UNIQUE NOT NULL,
-  name TEXT,
-  phone TEXT,
   marked_by UUID REFERENCES auth.users(id),
   marked_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  notes TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -65,8 +62,8 @@ The "do not contact" functionality will integrate with the existing anonymous us
 
 1. When a user is marked as "do not contact":
    - Generate the anonymous hash for the user using the same algorithm used in the anonymous_users table
-   - Store this hash in the `do_not_contact` table along with minimal contextual information
-   - This ensures privacy while maintaining the ability to identify these users consistently
+   - Store only this hash in the `do_not_contact` table without any personally identifiable information
+   - This approach ensures complete privacy while maintaining the ability to identify these users consistently
 
 2. When displaying contacts:
    - Generate the hash for each contact
@@ -143,7 +140,7 @@ async function toggleDoNotContactStatus(
   doNotContact: boolean
 ): Promise<{ success: boolean; message: string }> {
   // Generate the user hash
-  // If doNotContact=true, insert into do_not_contact table
+  // If doNotContact=true, insert into do_not_contact table with only the hash
   // If doNotContact=false, delete from do_not_contact table
   // Return success/failure message
 }
@@ -197,7 +194,9 @@ The UI should clearly indicate:
 7. Test with various device sizes for responsive design
 
 ## Privacy and Security Considerations
-- Store minimal identifying information in the do_not_contact table
-- Use the same hashing algorithm as anonymous_users for consistency
-- Ensure all database operations have appropriate row-level security
-- Only authenticated users can view and modify the do-not-contact list 
+- **No personally identifiable information**: The do_not_contact table stores only anonymous hashes and metadata
+- **Complete anonymity**: Even if the database is compromised, it contains no personally identifiable information
+- **Hash-based identification**: Uses the same secure hashing algorithm as anonymous_users for consistency
+- **Minimal data collection**: Only stores the absolute minimum data required to identify contacts for exclusion
+- **Zero exposure risk**: No name, phone, or other contact details are stored in the do_not_contact table
+- **Robust access control**: Row-level security ensures only authenticated users can view and modify the list 
