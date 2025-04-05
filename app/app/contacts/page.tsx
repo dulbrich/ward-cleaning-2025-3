@@ -387,6 +387,11 @@ export default function ContactsPage() {
     };
   }, []);
 
+  // Add a new handler function for clearing the search
+  const handleClearSearch = () => {
+    setSearchQuery('');
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -394,26 +399,53 @@ export default function ContactsPage() {
         <div className="flex gap-2">
           <div className="relative">
             <input
-              type="search"
+              type="text" // Changed from "search" to "text" to disable browser's native clear button
               placeholder="Search contacts..."
-              className="rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
+              className="rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background pr-8"
               value={searchQuery}
               onChange={handleSearchChange}
             />
-            <svg
-              className="absolute right-3 top-2.5 h-4 w-4 text-muted-foreground"
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-              />
-            </svg>
+            <div className="absolute right-3 top-2.5 h-4 w-4 flex items-center justify-center">
+              {searchQuery ? (
+                // Custom clear button (X)
+                <button
+                  onClick={handleClearSearch}
+                  className="text-muted-foreground hover:text-foreground transition-colors"
+                  aria-label="Clear search"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    className="h-4 w-4"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
+                  </svg>
+                </button>
+              ) : (
+                // Search icon
+                <svg
+                  className="h-4 w-4 text-muted-foreground pointer-events-none"
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                  />
+                </svg>
+              )}
+            </div>
           </div>
         </div>
       </div>
