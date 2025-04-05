@@ -1,8 +1,7 @@
 "use client";
 
-import { ProfileForm } from "@/components/profile/profile-form";
-import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { ProfileForm } from "./profile-form";
 
 // Define user profile interface
 interface UserProfile {
@@ -18,7 +17,6 @@ interface UserProfile {
 }
 
 export default function SettingsPage() {
-  const router = useRouter();
   const [activeTab, setActiveTab] = useState("Profile");
   const [userData, setUserData] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -27,36 +25,50 @@ export default function SettingsPage() {
   useEffect(() => {
     async function fetchUserData() {
       try {
-        // Try to fetch user profile from the server (or session)
+        // Try to fetch user profile from the API
+        console.log("Fetching user profile data...");
         const response = await fetch('/api/user/profile');
         
         if (response.ok) {
           const data = await response.json();
+          console.log("Successfully loaded user data:", data);
           setUserData(data);
-          console.log("Loaded user data:", data); // Add logging to verify data is fetched
         } else {
-          console.error("Error fetching profile: Response not OK"); // Log error response
-          // Fallback to session data or local storage if available
-          const storedUser = sessionStorage.getItem('user');
-          if (storedUser) {
-            setUserData(JSON.parse(storedUser));
-          } else {
-            // Use default mock data as last resort
-            setUserData({
-              id: "user_123",
-              first_name: "",
-              last_name: "",
-              username: "",
-              email: "",
-              phone_number: "",
-              is_phone_verified: false,
-              avatar_url: "/images/avatars/default.png",
-              role: "user"
-            });
+          console.error("Error fetching profile:", response.status, response.statusText);
+          try {
+            const errorText = await response.text();
+            console.error("Error response:", errorText);
+          } catch (e) {
+            console.error("Could not read error response");
           }
+          
+          // Fallback to mock data if API fails
+          setUserData({
+            id: "user_123",
+            first_name: "Default",
+            last_name: "User",
+            username: "defaultuser",
+            email: "default.user@example.com",
+            phone_number: "(555) 123-4567",
+            is_phone_verified: true,
+            avatar_url: "/images/avatars/default.png",
+            role: "user"
+          });
         }
       } catch (error) {
-        console.error("Error fetching user data:", error);
+        console.error("Exception fetching user data:", error);
+        // Use fallback data on error
+        setUserData({
+          id: "user_123",
+          first_name: "Default",
+          last_name: "User",
+          username: "defaultuser",
+          email: "default.user@example.com",
+          phone_number: "(555) 123-4567",
+          is_phone_verified: true,
+          avatar_url: "/images/avatars/default.png",
+          role: "user"
+        });
       } finally {
         setLoading(false);
       }

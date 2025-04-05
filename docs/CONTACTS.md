@@ -76,23 +76,50 @@ The "do not contact" functionality will integrate with the existing anonymous us
 Enhance the existing contacts display with:
 
 1. **User Type Indicator**:
-   - Small badge/icon next to each name showing "Imported" or "Registered"
-   - Determine this by checking if the user's hash exists in the anonymous_users table and its `user_type` value
+   - **Desktop**: Small badge/icon next to each name showing "Imported" or "Registered" (right-justified)
+   - **Mobile**: Subtle green background tint for registered users, no explicit type label
+   - Determine type by checking if the user's hash exists in the anonymous_users table and its `user_type` value
 
-2. **"Do Not Contact" Toggle**:
-   - Replace the current "X" button with a toggle button or switch
-   - When toggled on (do not contact), change the appearance of the entire contact row
-   - Apply a distinct visual indicator (e.g., red highlight, strikethrough text, "Do Not Contact" badge)
+2. **"Do Not Contact" Functionality**:
+   - **Desktop**: Toggle switch button next to each imported user (registered users display "Self-managed" text)
+   - **Mobile**: Swipe-left gesture to mark/unmark imported users as "do not contact" (no visible toggle button)
+   - When a contact is marked as "do not contact", the entire row changes appearance
 
 3. **Visual Indicators**:
    - Contacts marked as "do not contact" should be visually distinct:
-     - Desktop: Background color change to light red or gray
-     - Mobile: "Do Not Contact" badge or icon clearly visible
+     - **Desktop**: Background color change to light red, toggle button in active state
+     - **Mobile**: Red background tint without explicit "Do Not Contact" text label
+   - Registered users have a visual indicator:
+     - **Desktop**: "Self-managed" text in place of the toggle
+     - **Mobile**: Small green dot and subtle green background tint
+
+4. **Search Functionality**:
+   - Search input with custom clear button (X) that appears in the same position as the search icon
+   - Clear button visible only when search text is present
+   - Search icon visible only when search field is empty
 
 ### Responsive Design
-Maintain the existing responsive design patterns:
-- Desktop: Grid layout with columns for name, role, contact info, and actions
-- Mobile: Condensed layout with essential information and toggle button
+The design adapts to different screen sizes:
+- **Desktop**: Grid layout with columns for name, role, contact info, and toggle/status
+- **Mobile**: 
+  - Condensed layout with simplified information
+  - Swipe-left interaction rather than toggle button
+  - Right-justified phone numbers
+  - Visual indicators through background colors instead of text labels
+  - Small icons instead of text labels where possible
+
+## Special Handling for User Types
+
+### Imported Users
+- Can be marked as "do not contact" by admin users
+- Toggle switch (desktop) or swipe gesture (mobile) available
+- Status saved to database via anonymous hash
+
+### Registered Users 
+- Cannot be marked as "do not contact" by admin users
+- Display as "Self-managed" (desktop) or with green dot indicator (mobile)
+- No toggle button or swipe functionality available
+- Manage their own preferences separately
 
 ## Technical Implementation Details
 
@@ -112,9 +139,10 @@ interface Contact {
   householdRole?: string;
   
   // New properties
-  userType?: 'imported' | 'registered';
+  userType?: 'imported' | 'registered' | 'unknown';
   doNotContact?: boolean;
   userHash?: string; // For internal use only, not displayed
+  _updated?: number; // Timestamp for React state management
 }
 ```
 
@@ -139,6 +167,7 @@ async function toggleDoNotContactStatus(
   contact: Contact,
   doNotContact: boolean
 ): Promise<{ success: boolean; message: string }> {
+  // Skip registered users
   // Generate the user hash
   // If doNotContact=true, insert into do_not_contact table with only the hash
   // If doNotContact=false, delete from do_not_contact table
@@ -146,52 +175,48 @@ async function toggleDoNotContactStatus(
 }
 ```
 
-### Integration with Existing Code
-Modify the existing ContactsPage component:
-
-1. Add state for tracking do-not-contact status:
+### Mobile Interaction
+Implement touch gestures for mobile users:
 ```typescript
-const [doNotContactHashes, setDoNotContactHashes] = useState<Set<string>>(new Set());
-```
+// Touch event handlers for swipe functionality
+const handleTouchStart = (e: React.TouchEvent, contactHash: string) => {
+  // Track starting position of swipe
+}
 
-2. Load do-not-contact status with contacts:
-```typescript
-useEffect(() => {
-  // After contacts are loaded:
-  // - Call checkDoNotContactStatus to enhance contacts with doNotContact status
-  // - Update the contacts state with the enhanced data
-  // - Extract user hashes of "do not contact" users into the doNotContactHashes state
-}, [contacts]);
-```
+const handleTouchMove = (e: React.TouchEvent) => {
+  // Track current position during swipe
+}
 
-3. Add toggle function:
-```typescript
-const handleToggleDoNotContact = async (contact: Contact) => {
-  // Toggle the do-not-contact status for this contact
-  // Call toggleDoNotContactStatus API function
-  // Update local state based on result
-};
+const handleTouchEnd = (contact: Contact) => {
+  // If swipe distance exceeds threshold and contact is not registered
+  // Toggle contact's do-not-contact status
+}
 ```
 
 ## Visual Design
 The UI should clearly indicate:
 
 1. **Default state**: Normal contact display
+   - Imported: White/transparent background
+   - Registered: Subtle green background tint, green dot indicator (mobile)
+
 2. **Do Not Contact state**:
-   - Desktop: Row with red/gray background, "Do Not Contact" badge
-   - Mobile: Contact with visible "Do Not Contact" indicator
-3. **Toggle button**:
-   - Unchecked: Normal state
-   - Checked: Do Not Contact state
+   - Desktop: Row with red background, toggle in active position
+   - Mobile: Red background tint, no explicit label
+
+3. **Interactive elements**:
+   - Desktop: Toggle button for imported users, "Self-managed" text for registered
+   - Mobile: Swipe gesture for imported users, no interaction for registered
 
 ## Implementation Plan
 1. Create do_not_contact database table
 2. Implement server-side API functions for checking and toggling status
 3. Extend the Contact interface and state management
-4. Update the UI to show user type and do-not-contact status
-5. Implement the toggle functionality
-6. Add visual indicators for do-not-contact status
-7. Test with various device sizes for responsive design
+4. Implement desktop view with toggle buttons
+5. Implement mobile view with swipe functionality
+6. Add visual indicators for all user states
+7. Ensure proper key management for React rendering
+8. Test with various device sizes for responsive design
 
 ## Privacy and Security Considerations
 - **No personally identifiable information**: The do_not_contact table stores only anonymous hashes and metadata

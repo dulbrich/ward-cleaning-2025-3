@@ -16,13 +16,15 @@ export const metadata = {
   description: "Simplifying ward building cleaning management for the LDS church",
   icons: {
     icon: "/images/logo.png",
-  },
-  viewport: {
-    width: "device-width",
-    initialScale: 1,
-    maximumScale: 1,
-    userScalable: false,
   }
+};
+
+// Separate viewport export as recommended by Next.js
+export const viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
 };
 
 const inter = Inter({
@@ -36,16 +38,20 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  // Get auth status from Supabase
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  const isAuthenticated = !!user;
+  // Use try-catch to avoid breaking the app if Supabase client fails
+  let isAuthenticated = false;
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    isAuthenticated = !!user;
+  } catch (error) {
+    console.error("Error checking authentication:", error);
+    // Default to unauthenticated if there's an error
+    isAuthenticated = false;
+  }
   
   return (
     <html lang="en" className={inter.className} suppressHydrationWarning>
-      <head>
-        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-      </head>
       <body className="bg-background text-foreground">
         <ThemeProvider
           attribute="class"
