@@ -109,6 +109,30 @@ function SimpleSignupForm({ setMessage }: { setMessage: (message: Message) => vo
     <form action={handleFormSubmit} className="flex flex-col w-full max-w-sm mx-auto">
       <h1 className="text-2xl font-medium mb-6">Create an account</h1>
       <div className="flex flex-col gap-4">
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <label htmlFor="firstName" className="text-sm font-medium">First Name</label>
+            <input 
+              id="firstName" 
+              name="firstName" 
+              type="text" 
+              placeholder="John" 
+              required 
+              className="w-full px-3 py-2 border rounded-md"
+            />
+          </div>
+          <div className="space-y-2">
+            <label htmlFor="lastName" className="text-sm font-medium">Last Name</label>
+            <input 
+              id="lastName" 
+              name="lastName" 
+              type="text" 
+              placeholder="Smith" 
+              required 
+              className="w-full px-3 py-2 border rounded-md"
+            />
+          </div>
+        </div>
         <div className="space-y-2">
           <label htmlFor="email" className="text-sm font-medium">Email</label>
           <input 
@@ -119,6 +143,20 @@ function SimpleSignupForm({ setMessage }: { setMessage: (message: Message) => vo
             required 
             className="w-full px-3 py-2 border rounded-md"
           />
+        </div>
+        <div className="space-y-2">
+          <label htmlFor="phoneNumber" className="text-sm font-medium">Phone Number</label>
+          <input 
+            id="phoneNumber" 
+            name="phoneNumber" 
+            type="tel" 
+            placeholder="(555) 123-4567" 
+            required 
+            className="w-full px-3 py-2 border rounded-md"
+          />
+          <p className="text-xs text-muted-foreground">
+            Used for ward cleaning notifications and coordination
+          </p>
         </div>
         <div className="space-y-2">
           <label htmlFor="password" className="text-sm font-medium">Password</label>

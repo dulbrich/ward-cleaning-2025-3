@@ -1,5 +1,6 @@
 "use server";
 
+import { generateAnonymousHash } from "@/app/app/tools/actions";
 import { createClient } from "@/utils/supabase/server";
 import { encodedRedirect } from "@/utils/utils";
 import { headers } from "next/headers";
@@ -8,6 +9,9 @@ import { redirect } from "next/navigation";
 export const signUpAction = async (formData: FormData): Promise<string> => {
   const email = formData.get("email")?.toString();
   const password = formData.get("password")?.toString();
+  const firstName = formData.get("firstName")?.toString();
+  const lastName = formData.get("lastName")?.toString();
+  const phoneNumber = formData.get("phoneNumber")?.toString();
   const supabase = await createClient();
   const origin = (await headers()).get("origin");
 
@@ -19,11 +23,24 @@ export const signUpAction = async (formData: FormData): Promise<string> => {
     );
   }
 
+  if (!firstName || !lastName || !phoneNumber) {
+    return encodedRedirect(
+      "error",
+      "/sign-up",
+      "First name, last name, and phone number are required",
+    );
+  }
+
   const { error, data } = await supabase.auth.signUp({
     email,
     password,
     options: {
       emailRedirectTo: `${origin}/auth/callback`,
+      data: {
+        first_name: firstName,
+        last_name: lastName,
+        phone_number: phoneNumber,
+      },
     },
   });
 
@@ -31,6 +48,51 @@ export const signUpAction = async (formData: FormData): Promise<string> => {
     console.error(error.code + " " + error.message);
     return encodedRedirect("error", "/sign-up", error.message);
   } else {
+    // Check if this user was previously imported by generating the anonymous hash
+    try {
+      const userHash = generateAnonymousHash(firstName, lastName, phoneNumber);
+      
+      // Check if the hash exists in anonymous_users table
+      const { data: existingUser, error: lookupError } = await supabase
+        .from('anonymous_users')
+        .select('id, user_type')
+        .eq('user_hash', userHash)
+        .maybeSingle();
+        
+      if (lookupError) {
+        console.error("Error looking up anonymous user during signup:", lookupError);
+      } else if (existingUser) {
+        // Get the authenticated user
+        const { data: { user } } = await supabase.auth.getUser();
+        
+        if (user && existingUser.user_type === 'imported') {
+          // Update the existing record to mark as registered
+          await supabase
+            .from('anonymous_users')
+            .update({ 
+              user_type: 'registered',
+              registered_at: new Date().toISOString(),
+              registered_user_id: user.id
+            })
+            .eq('id', existingUser.id);
+        }
+      } else if (data?.user) {
+        // This user wasn't imported before - create a new anonymous record
+        await supabase
+          .from('anonymous_users')
+          .insert([{ 
+            user_hash: userHash,
+            user_type: 'registered',
+            registered_at: new Date().toISOString(),
+            registered_user_id: data.user.id,
+            import_count: 0
+          }]);
+      }
+    } catch (err) {
+      console.error("Error tracking anonymous user during signup:", err);
+      // Don't fail registration if tracking fails
+    }
+    
     return encodedRedirect(
       "success",
       "/sign-up",

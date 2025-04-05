@@ -1,10 +1,11 @@
 "use client";
 
 import { createClient } from "@/utils/supabase/client";
+import { Loader2 } from "lucide-react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { getLastWardDataImport, logWardDataImport } from "./actions";
+import { getLastWardDataImport, logWardDataImport, trackAnonymousUser } from "./actions";
 
 // Dynamically import SyntaxHighlighter to prevent SSR issues
 const DynamicSyntaxHighlighter = dynamic(
@@ -113,6 +114,13 @@ function InstructionStep({ number, title, description }: { number: number; title
   );
 }
 
+// Add this after the imports
+declare global {
+  interface Window {
+    debugAnonymousTracking: () => Promise<void>;
+  }
+}
+
 export default function WardContactImportPage() {
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
@@ -120,6 +128,9 @@ export default function WardContactImportPage() {
   const [success, setSuccess] = useState(false);
   const [lastImportDate, setLastImportDate] = useState<string | null>(null);
   const [authError, setAuthError] = useState(false);
+  const [trackedUsers, setTrackedUsers] = useState<{ new: number, existing: number }>({ new: 0, existing: 0 });
+  const [message, setMessage] = useState<string>('');
+  const [importProgress, setImportProgress] = useState<number | null>(null);
   const router = useRouter();
   const supabase = createClient();
 
@@ -199,6 +210,37 @@ export default function WardContactImportPage() {
     checkAuth();
   }, [supabase]);
 
+  // Add this inside the export default function WardContactImportPage component
+  // Add it near the beginning, before the handleFileChange function
+  // This sets up a debug function we can call from the browser console
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.debugAnonymousTracking = async () => {
+        try {
+          console.log("Starting debug anonymous tracking test...");
+          const testUser = {
+            firstName: "John",
+            lastName: "Smith",
+            phoneNumber: "555-123-4567"
+          };
+          
+          console.log(`Testing with user: ${testUser.firstName} ${testUser.lastName}`);
+          const result = await trackAnonymousUser(
+            testUser.firstName,
+            testUser.lastName,
+            testUser.phoneNumber
+          );
+          
+          console.log("Debug tracking result:", result);
+          alert(`Anonymous tracking test completed. Check console for details.\nResult: ${result.success ? 'Success' : 'Failed'}`);
+        } catch (err) {
+          console.error("Error in debug tracking:", err);
+          alert("Error testing anonymous tracking. See console for details.");
+        }
+      };
+    }
+  }, []);
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       setFile(e.target.files[0]);
@@ -214,6 +256,8 @@ export default function WardContactImportPage() {
 
     setLoading(true);
     setError(null);
+    setImportProgress(0);
+    setTrackedUsers({ new: 0, existing: 0 });
     
     try {
       // Check authentication first
@@ -227,13 +271,82 @@ export default function WardContactImportPage() {
       const fileContent = await file.text();
       let jsonData;
       
+      // Initialize arrays before JSON parsing
+      const allMembers = [];
+      const trackedUsers: { firstName: string, lastName: string, result: any }[] = [];
+      
       try {
         jsonData = JSON.parse(fileContent);
+        
+        // Log the basic structure for diagnostic purposes
+        console.log("JSON Data Top-Level Structure:", Object.keys(jsonData));
+        
+        // Check if it's an array at the top level
+        if (Array.isArray(jsonData)) {
+          console.log("Top-level is an array with", jsonData.length, "items");
+          console.log("First item keys:", jsonData[0] ? Object.keys(jsonData[0]) : "empty");
+          
+          // Add a direct approach to handle this format
+          console.log("Looking for household heads in array...");
+          let headCount = 0;
+          let phoneCount = 0;
+          
+          // Filter format from docs/ward.json
+          for (const household of jsonData) {
+            if (household.members && Array.isArray(household.members)) {
+              for (const member of household.members) {
+                if (member.head === true) {
+                  headCount++;
+                  if (member.phone) {
+                    phoneCount++;
+                    // This is a household head with a phone number - add to our list
+                    allMembers.push(member);
+                    console.log(`Found household head with phone: ${member.givenName} ${member.surname}`);
+                  } else {
+                    console.log(`Found household head WITHOUT phone: ${member.givenName} ${member.surname}`);
+                  }
+                }
+              }
+            }
+          }
+          
+          console.log(`Found ${headCount} total household heads, ${phoneCount} with phone numbers`);
+        } else {
+          // Original structure handling continues below
+          // Extract from households if available
+          if (jsonData.households && Array.isArray(jsonData.households)) {
+            for (const household of jsonData.households) {
+              if (household.members && Array.isArray(household.members)) {
+                // Only add household heads with phone numbers
+                const householdHeads = household.members.filter((member: any) => 
+                  member.head === true && 
+                  member.phone && 
+                  (typeof member.phone === 'object' ? member.phone.number || member.phone.e164 : member.phone)
+                );
+                allMembers.push(...householdHeads);
+              }
+            }
+          }
+          
+          // If we're using a different structure, handle it similarly
+          if (jsonData.members && Array.isArray(jsonData.members)) {
+            // Filter for household heads with phone numbers
+            const householdHeads = jsonData.members.filter((member: any) => 
+              member.head === true && 
+              member.phone && 
+              (typeof member.phone === 'object' ? member.phone.number || member.phone.e164 : member.phone)
+            );
+            allMembers.push(...householdHeads);
+          }
+        }
       } catch (e) {
         throw new Error("Invalid JSON file. Please ensure you're importing the correct file.");
       }
       
-      // Validate basic structure (this is a simple check, enhance as needed)
+      // Log the structure of the JSON data to help diagnose issues
+      console.log("JSON Data Structure:", Object.keys(jsonData));
+      
+      // Validate basic structure
       if (!jsonData || typeof jsonData !== 'object') {
         throw new Error("Invalid data format. The file doesn't contain the expected data structure.");
       }
@@ -241,35 +354,136 @@ export default function WardContactImportPage() {
       // Store in localStorage
       localStorage.setItem('wardContactData', JSON.stringify(jsonData));
       
-      // Get record count (assuming households is an array in the JSON structure)
-      const recordCount = Array.isArray(jsonData.households) ? jsonData.households.length : 
-                         (typeof jsonData === 'object' ? Object.keys(jsonData).length : 0);
+      // Start tracking anonymous users
+      console.log("Starting anonymous user tracking.");
       
-      // Log import in database using server action
-      const result = await logWardDataImport(recordCount);
+      // Process each household/member
+      const batchSize = 10; // Process 10 members at a time
       
-      if (result.error) {
-        if (result.error === "Not authenticated") {
-          setAuthError(true);
-          throw new Error("You must be logged in to complete the import process");
-        } else {
-          console.error("Database error:", result.error);
-          // Don't throw, we'll still mark the import as successful since the data is in localStorage
+      for (let i = 0; i < allMembers.length; i += batchSize) {
+        // Update progress
+        setImportProgress(Math.round((i / allMembers.length) * 100));
+        
+        // Get the current batch
+        const batch = allMembers.slice(i, i + batchSize);
+        console.log(`Processing batch ${i / batchSize + 1} of ${Math.ceil(allMembers.length / batchSize)}, with ${batch.length} members`);
+        
+        // Process each member in the batch
+        const batchPromises = batch.map(async (member) => {
+          try {
+            // Extract name data
+            const firstName = member.givenName || '';
+            const lastName = member.surname || '';
+            
+            // Extract phone number
+            let phoneNumber = '';
+            if (typeof member.phone === 'string') {
+              phoneNumber = member.phone;
+            } else if (typeof member.phone === 'object' && member.phone) {
+              phoneNumber = member.phone.number || member.phone.e164 || '';
+            }
+            
+            // Skip records without sufficient data
+            if (!firstName || !lastName || !phoneNumber) {
+              console.log(`Skipping member due to missing data`, {
+                firstName: !!firstName,
+                lastName: !!lastName,
+                phoneNumber: !!phoneNumber
+              });
+              return;
+            }
+            
+            // Log the member we're about to track (with limited data for privacy)
+            console.log(`Tracking household head: ${firstName} ${lastName}`, 
+                        phoneNumber ? `phone ending in: ${phoneNumber.slice(-4)}` : 'no phone');
+            
+            // Track the anonymous user
+            const result = await trackAnonymousUser(firstName, lastName, phoneNumber);
+            
+            if (result.success) {
+              trackedUsers.push({ firstName, lastName, result });
+              console.log(`Successfully tracked: ${firstName} ${lastName}`);
+            } else {
+              console.warn(`Failed to track: ${firstName} ${lastName}`, result.error);
+              
+              // If the failure is due to a database error, retry once
+              if (result.error && typeof result.error === 'string' && 
+                  (result.error.includes('database') || result.error.includes('timeout'))) {
+                console.log(`Retrying tracking for: ${firstName} ${lastName}`);
+                // Wait a bit before retrying
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                
+                try {
+                  const retryResult = await trackAnonymousUser(firstName, lastName, phoneNumber);
+                  if (retryResult.success) {
+                    trackedUsers.push({ firstName, lastName, result: retryResult });
+                    console.log(`Successfully tracked on retry: ${firstName} ${lastName}`);
+                  } else {
+                    console.error(`Failed to track even after retry: ${firstName} ${lastName}`, retryResult.error);
+                  }
+                } catch (retryErr) {
+                  console.error(`Error during retry: ${firstName} ${lastName}`, retryErr);
+                }
+              }
+            }
+          } catch (memberError) {
+            console.error('Error processing individual member:', memberError);
+          }
+        });
+        
+        // Wait for all promises in the batch to complete
+        await Promise.all(batchPromises);
+        
+        // Add a delay between batches to avoid overwhelming the database
+        if (i + batchSize < allMembers.length) {
+          console.log(`Batch ${i / batchSize + 1} complete, pausing before next batch...`);
+          await new Promise(resolve => setTimeout(resolve, 1000));
         }
       }
       
-      // Update last import date
-      const now = new Date().toLocaleString();
-      localStorage.setItem('wardContactLastImport', now);
-      setLastImportDate(now);
+      // Final progress update to 100%
+      setImportProgress(100);
+      
+      console.log(`Successfully tracked ${trackedUsers.length} household heads.`);
+      
+      // Log the import
+      await logWardDataImport(allMembers.length);
+      
+      const trackedCount = {
+        new: trackedUsers.length,
+        existing: 0
+      };
+      
+      setTrackedUsers(trackedCount);
       
       setSuccess(true);
+      setMessage(`Successfully imported ${allMembers.length} contacts and tracked ${trackedCount.new} anonymous users.`);
       setTimeout(() => {
         setSuccess(false);
+        setImportProgress(null); // Reset progress
       }, 3000);
+
+      // Move the debug output up, before batch processing
+      console.log(`Found ${allMembers.length} household heads to process.`);
       
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "An unknown error occurred during import");
+      // Add a sample of the data we found for debugging
+      if (allMembers.length > 0) {
+        console.log("Sample of first household head found:");
+        const sample = allMembers[0];
+        console.log({
+          givenName: sample.givenName,
+          surname: sample.surname,
+          phoneType: typeof sample.phone,
+          phoneKeys: typeof sample.phone === 'object' ? Object.keys(sample.phone) : 'N/A',
+          hasPhoneNumber: typeof sample.phone === 'object' ? !!sample.phone.number : 'N/A',
+          hasE164: typeof sample.phone === 'object' ? !!sample.phone.e164 : 'N/A'
+        });
+      } else {
+        console.log("No household heads found. Check the data structure.");
+      }
+    } catch (error) {
+      console.error('Error processing JSON:', error);
+      setError(error instanceof Error ? error.message : "An unknown error occurred during import");
     } finally {
       setLoading(false);
     }
@@ -303,6 +517,10 @@ export default function WardContactImportPage() {
         <p className="mb-3 text-muted-foreground">
           The data you import is <strong>stored locally on your device</strong> and is not shared with anyone.
           It's used only for coordinating ward cleaning assignments within this application.
+        </p>
+        <p className="mb-3 text-muted-foreground">
+          For tracking purposes only, a secure, anonymous hash of partial contact information is stored in the database.
+          No personally identifiable information is retained in this process.
         </p>
         {lastImportDate && (
           <div className="mt-4 text-sm p-3 bg-muted rounded-md">
@@ -381,19 +599,42 @@ export default function WardContactImportPage() {
             {error && <p className="mt-2 text-sm text-red-500">{error}</p>}
           </div>
           
-          <button
-            onClick={handleImport}
-            disabled={loading || !file}
-            className={`w-full px-4 py-2 rounded-md text-sm font-medium text-white ${
-              loading || !file ? 'bg-primary/50 cursor-not-allowed' : 'bg-primary hover:bg-primary/90'
-            }`}
-          >
-            {loading ? "Importing..." : "Import Contacts"}
-          </button>
+          {loading ? (
+            <div className="flex flex-col items-center justify-center">
+              <Loader2 className="w-8 h-8 text-primary animate-spin mb-2" />
+              {importProgress !== null && (
+                <div className="w-full mt-2">
+                  <div className="w-full bg-muted rounded-full h-2.5">
+                    <div
+                      className="bg-primary h-2.5 rounded-full transition-all duration-300"
+                      style={{ width: `${importProgress}%` }}
+                    ></div>
+                  </div>
+                  <p className="text-xs text-center mt-1">{importProgress}% Complete</p>
+                </div>
+              )}
+              <p className="text-sm mt-2">Importing contacts...</p>
+            </div>
+          ) : (
+            <button
+              onClick={handleImport}
+              disabled={!file}
+              className={`w-full px-4 py-2 rounded-md text-sm font-medium text-white ${
+                !file ? 'bg-primary/50 cursor-not-allowed' : 'bg-primary hover:bg-primary/90'
+              }`}
+            >
+              Import Contacts
+            </button>
+          )}
           
           {success && (
             <div className="mt-4 p-3 bg-green-100 text-green-700 rounded-md">
-              Ward contacts imported successfully! The data is now available for use in the application.
+              <p>{message}</p>
+              {(trackedUsers.new > 0 || trackedUsers.existing > 0) && (
+                <p className="text-xs mt-2">
+                  {trackedUsers.new > 0 && `${trackedUsers.new} household heads tracked.`}
+                </p>
+              )}
             </div>
           )}
         </div>
