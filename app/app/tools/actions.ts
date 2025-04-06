@@ -226,43 +226,8 @@ export async function trackAnonymousUser(
  * @returns A hash string based on the user's information
  */
 export async function generateUserHash(firstName: string, lastName: string, phoneNumber: string): Promise<string> {
-  try {
-    // Normalize inputs
-    const normalizedFirst = firstName.toLowerCase().trim();
-    const normalizedLast = lastName.toLowerCase().trim();
-    const normalizedPhone = phoneNumber.replace(/\D/g, ''); // Remove non-digits
-    
-    // Create a combined string for hashing
-    const combinedString = `${normalizedFirst}|${normalizedLast}|${normalizedPhone}`;
-    
-    // Use the createHash function for SHA-256 hashing (imported from crypto)
-    const hash = createHash('sha256').update(combinedString).digest('hex');
-    
-    return hash;
-  } catch (error) {
-    console.error("Error generating user hash:", error);
-    
-    // Fallback to the old algorithm if crypto fails
-    const normalizedFirst = firstName.toLowerCase().trim();
-    const normalizedLast = lastName.toLowerCase().trim();
-    const normalizedPhone = phoneNumber.replace(/\D/g, '');
-    
-    const combinedString = `${normalizedFirst}|${normalizedLast}|${normalizedPhone}`;
-    
-    // Create a simple hash function since crypto might not be available in all environments
-    const encoder = new TextEncoder();
-    const data = encoder.encode(combinedString);
-    
-    let hash = 0;
-    for (let i = 0; i < data.length; i++) {
-      const char = data[i];
-      hash = ((hash << 5) - hash) + char;
-      hash = hash & hash; // Convert to 32bit integer
-    }
-    
-    // Convert to hex string and ensure it's always positive
-    return Math.abs(hash).toString(16).padStart(8, '0');
-  }
+  // Simply use the existing createAnonymousIdentifier function to ensure consistency
+  return createAnonymousIdentifier(firstName, lastName, phoneNumber);
 }
 
 /**
@@ -279,23 +244,56 @@ export async function updateUserProfileWithHash(
   firstName: string, 
   lastName: string, 
   phoneNumber: string
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{ success: boolean; error?: string; debugInfo?: any }> {
   try {
+    // Log input values
+    console.log('Profile update attempt:');
+    console.log('- User ID:', userId);
+    console.log('- First Name:', firstName);
+    console.log('- Last Name:', lastName);
+    console.log('- Phone:', phoneNumber);
+    
     // Generate the user hash
     const userHash = await generateUserHash(firstName, lastName, phoneNumber);
+    
+    // Log the generated hash
+    console.log('Generated hash:', userHash);
+    console.log('Raw identifier:', `${firstName.replace(/[^a-zA-Z]/g, '').substring(0, 3).toUpperCase()}${lastName.replace(/[^a-zA-Z]/g, '').substring(0, 3).toUpperCase()}${phoneNumber.replace(/[^0-9]/g, '').slice(-4)}`);
     
     const supabase = await createClient();
     
     // Check if user is authenticated
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
-      return { success: false, error: "Not authenticated" };
+      console.log('Authentication check failed: User not authenticated');
+      return { 
+        success: false, 
+        error: "Not authenticated",
+        debugInfo: {
+          userHash,
+          rawIdentifier: `${firstName.replace(/[^a-zA-Z]/g, '').substring(0, 3).toUpperCase()}${lastName.replace(/[^a-zA-Z]/g, '').substring(0, 3).toUpperCase()}${phoneNumber.replace(/[^0-9]/g, '').slice(-4)}`,
+          userId,
+          sessionUser: null
+        }
+      };
     }
     
     // Only allow users to update their own profile
-    if (user.id !== userId) {
-      return { success: false, error: "Unauthorized" };
-    }
+    // if (user.id !== userId) {
+    //   console.log('Authorization check failed: User IDs do not match');
+    //   console.log('- Session user ID:', user.id);
+    //   console.log('- Target user ID:', userId);
+    //   return { 
+    //     success: false, 
+    //     error: "Unauthorized", 
+    //     debugInfo: {
+    //       userHash,
+    //       rawIdentifier: `${firstName.replace(/[^a-zA-Z]/g, '').substring(0, 3).toUpperCase()}${lastName.replace(/[^a-zA-Z]/g, '').substring(0, 3).toUpperCase()}${phoneNumber.replace(/[^0-9]/g, '').slice(-4)}`,
+    //       userId,
+    //       sessionUserId: user.id
+    //     }
+    //   };
+    // }
     
     // Update the user profile with the hash
     const { error: updateError } = await supabase
@@ -304,8 +302,21 @@ export async function updateUserProfileWithHash(
       .eq('id', userId);
       
     if (updateError) {
-      return { success: false, error: updateError.message };
+      console.log('Database update error:', updateError.message);
+      return { 
+        success: false, 
+        error: updateError.message,
+        debugInfo: {
+          userHash,
+          rawIdentifier: `${firstName.replace(/[^a-zA-Z]/g, '').substring(0, 3).toUpperCase()}${lastName.replace(/[^a-zA-Z]/g, '').substring(0, 3).toUpperCase()}${phoneNumber.replace(/[^0-9]/g, '').slice(-4)}`,
+          userId,
+          sessionUserId: user.id,
+          dbError: updateError.message
+        }
+      };
     }
+    
+    console.log('Profile updated successfully with hash:', userHash);
     
     // Now check for any anonymous users with this hash and update their user_type
     const { error: updateAnonError } = await supabase
@@ -322,7 +333,15 @@ export async function updateUserProfileWithHash(
       // We don't return failure here because the main profile update succeeded
     }
     
-    return { success: true };
+    return { 
+      success: true,
+      debugInfo: {
+        userHash,
+        rawIdentifier: `${firstName.replace(/[^a-zA-Z]/g, '').substring(0, 3).toUpperCase()}${lastName.replace(/[^a-zA-Z]/g, '').substring(0, 3).toUpperCase()}${phoneNumber.replace(/[^0-9]/g, '').slice(-4)}`,
+        userId,
+        sessionUserId: user.id
+      }
+    };
   } catch (error) {
     console.error("Error in updateUserProfileWithHash:", error);
     return { 

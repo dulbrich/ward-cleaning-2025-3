@@ -173,12 +173,24 @@ export function ProfileForm({ userData }: ProfileFormProps) {
     setIsLoading(true);
     
     try {
+      // Log that we're starting the profile save
+      console.log('Starting profile save operation...');
+      
       // Prepare the data to send
       const dataToSave = {
         ...formData,
         phone_number: unformatPhoneNumber(verifiedPhone || formData.phone_number),
         is_phone_verified: isVerified || userData?.is_phone_verified
       };
+      
+      // Log the data being saved
+      console.log('Saving profile data:', {
+        first_name: dataToSave.first_name,
+        last_name: dataToSave.last_name,
+        phone_number: dataToSave.phone_number,
+        avatar_url: dataToSave.avatar_url,
+        is_phone_verified: dataToSave.is_phone_verified
+      });
       
       // Call the API to update the profile
       const response = await fetch("/api/user/profile", {
@@ -188,10 +200,12 @@ export function ProfileForm({ userData }: ProfileFormProps) {
       });
       
       if (!response.ok) {
+        console.error('Profile update API response not OK:', response.status, response.statusText);
         throw new Error("Failed to update profile");
       }
       
       const updatedData = await response.json();
+      console.log('Profile update API response:', updatedData);
       
       // Update original phone if it was changed and verified
       if (verifiedPhone) {
@@ -201,6 +215,11 @@ export function ProfileForm({ userData }: ProfileFormProps) {
       // After saving, also update the user_hash in the profile
       // This will also check for anonymous user entries and update them
       if (userData?.id && formData.first_name && formData.last_name && formData.phone_number) {
+        console.log('Updating user hash with:');
+        console.log('- User ID:', userData.id);
+        console.log('- Name:', `${formData.first_name} ${formData.last_name}`);
+        console.log('- Phone:', unformatPhoneNumber(formData.phone_number));
+        
         try {
           const hashResult = await updateUserProfileWithHash(
             userData.id,
@@ -209,12 +228,20 @@ export function ProfileForm({ userData }: ProfileFormProps) {
             unformatPhoneNumber(formData.phone_number)
           );
           
+          console.log('Hash update result:', hashResult);
+          
           if (!hashResult.success) {
             console.error("Error updating user hash:", hashResult.error);
           }
         } catch (hashError) {
           console.error("Exception updating user hash:", hashError);
         }
+      } else {
+        console.warn('Missing data for hash update:');
+        console.warn('- User ID:', userData?.id);
+        console.warn('- First name:', formData.first_name);
+        console.warn('- Last name:', formData.last_name);
+        console.warn('- Phone:', formData.phone_number);
       }
       
       toast.success("Profile updated successfully");

@@ -130,7 +130,13 @@ export async function PUT(request: Request) {
   
   try {
     const data = await request.json();
-    console.log("Received update data:", data);
+    console.log("Received update data:", {
+      first_name: data.first_name,
+      last_name: data.last_name,
+      username: data.username,
+      phone_number: data.phone_number,
+      avatar_url: data.avatar_url?.substring(0, 30) + "..." // Truncate for logging
+    });
     
     // Validate required fields
     if (!data.first_name || !data.last_name || !data.username || !data.phone_number) {
@@ -146,6 +152,7 @@ export async function PUT(request: Request) {
     
     // Clean the phone number (remove formatting)
     const cleanedPhoneNumber = cleanPhoneNumber(data.phone_number);
+    console.log("Cleaned phone number:", cleanedPhoneNumber);
     
     // Create Supabase client
     const supabase = await createClient();
@@ -178,20 +185,32 @@ export async function PUT(request: Request) {
       });
     }
     
+    console.log("Authenticated user ID:", user.id);
+    
     // Get the existing profile first
     const { data: existingProfile, error: fetchError } = await supabase
       .from("user_profiles")
-      .select("id, phone_number")
+      .select("id, phone_number, user_hash")
       .eq("user_id", user.id)
       .single();
+    
+    if (existingProfile) {
+      console.log("Found existing profile:", {
+        id: existingProfile.id,
+        phone: existingProfile.phone_number,
+        existing_hash: existingProfile.user_hash
+      });
+    }
     
     let profileId;
     let isPhoneVerified = false;
     
     // Check if phone number has changed - if not, keep verification status
     if (existingProfile && cleanedPhoneNumber === existingProfile.phone_number) {
+      console.log("Phone number unchanged - maintaining verification status");
       isPhoneVerified = data.is_phone_verified || false;
     } else {
+      console.log("Phone number changed - using provided verification status");
       // If phone number has changed, set verified status based on input
       // This will typically be true if verification process was completed
       isPhoneVerified = data.is_phone_verified || false;
@@ -216,31 +235,40 @@ export async function PUT(request: Request) {
         .single();
       
       if (insertError) {
+        console.error("Error inserting new profile:", insertError);
         throw insertError;
       }
       
+      console.log("New profile created with ID:", newProfile.id);
       profileId = newProfile.id;
     } else {
       // Update existing profile
-      console.log("Updating existing profile");
+      console.log("Updating existing profile with ID:", existingProfile.id);
       profileId = existingProfile.id;
+      
+      const updateData = {
+        first_name: data.first_name,
+        last_name: data.last_name,
+        username: data.username,
+        avatar_url: data.avatar_url,
+        phone_number: cleanedPhoneNumber,
+        is_phone_verified: isPhoneVerified,
+        updated_at: new Date().toISOString()
+      };
+      
+      console.log("Update data:", updateData);
       
       const { error: updateError } = await supabase
         .from("user_profiles")
-        .update({
-          first_name: data.first_name,
-          last_name: data.last_name,
-          username: data.username,
-          avatar_url: data.avatar_url,
-          phone_number: cleanedPhoneNumber,
-          is_phone_verified: isPhoneVerified,
-          updated_at: new Date().toISOString()
-        })
+        .update(updateData)
         .eq("id", profileId);
       
       if (updateError) {
+        console.error("Error updating profile:", updateError);
         throw updateError;
       }
+      
+      console.log("Profile updated successfully");
     }
     
     // Fetch the updated profile
@@ -250,25 +278,41 @@ export async function PUT(request: Request) {
       .eq("id", profileId)
       .single();
     
-    if (refetchError) {
-      throw refetchError;
+    if (refetchError || !updatedProfile) {
+      console.error("Error fetching updated profile:", refetchError);
+      throw refetchError || new Error("Profile not found after update");
     }
     
-    // Format the phone number for response
-    const formattedPhoneNumber = formatPhoneNumber(cleanedPhoneNumber);
+    console.log("Retrieved updated profile with user_hash:", updatedProfile.user_hash);
     
-    return NextResponse.json({
-      ...updatedProfile,
+    // Format the phone number for response
+    const formattedPhoneNumber = formatPhoneNumber(updatedProfile.phone_number);
+    
+    // Map database fields to our API response
+    const responseData = {
+      id: updatedProfile.id,
+      user_id: updatedProfile.user_id,
+      first_name: updatedProfile.first_name,
+      last_name: updatedProfile.last_name,
+      username: updatedProfile.username,
+      email: user.email,
       phone_number: formattedPhoneNumber,
-      email: user.email || `${updatedProfile.username?.toLowerCase()}@gmail.com`,
-    }, {
+      is_phone_verified: updatedProfile.is_phone_verified,
+      avatar_url: updatedProfile.avatar_url,
+      role: updatedProfile.role,
+      // Include user_hash in the log but not in the response
+      // user_hash: updatedProfile.user_hash
+    };
+    
+    console.log("Sending response with updated profile");
+    return NextResponse.json(responseData, { 
       headers: corsHeaders(),
       status: 200
     });
   } catch (error) {
     console.error('Error updating user profile:', error);
     return NextResponse.json(
-      { error: 'Failed to update user profile' },
+      { error: 'Failed to update profile' },
       { 
         headers: corsHeaders(),
         status: 500 
