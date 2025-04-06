@@ -1,6 +1,6 @@
 "use server";
 
-import { generateAnonymousHash } from "@/app/app/tools/actions";
+import { generateUserHash } from "@/app/app/tools/actions";
 import { createClient } from "@/utils/supabase/server";
 import { revalidatePath } from "next/cache";
 
@@ -52,7 +52,7 @@ export async function checkDoNotContactStatus(contacts: Contact[]): Promise<Cont
       const lastName = nameParts.length > 1 ? nameParts[nameParts.length - 1] : '';
       
       // Generate hash for this contact
-      const userHash = await generateAnonymousHash(firstName, lastName, contact.phone);
+      const userHash = await generateUserHash(firstName, lastName, contact.phone);
       
       // Track hashes for collision detection
       if (!hashMap[userHash]) {

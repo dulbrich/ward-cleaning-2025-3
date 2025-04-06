@@ -1,5 +1,6 @@
 "use client";
 
+import { updateUserProfileWithHash } from "@/app/app/tools/actions";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { IMaskInput } from "react-imask";
@@ -16,6 +17,7 @@ interface ProfileFormProps {
     is_phone_verified: boolean;
     avatar_url: string;
     role: string;
+    user_hash?: string;
   } | null;
 }
 
@@ -38,10 +40,9 @@ function extractDigits(formattedNumber: string): string {
   return formattedNumber.replace(/\D/g, "");
 }
 
-// Helper function to unformat phone numbers for saving to database
+// Helper function to clean phone number for hash generation
 function unformatPhoneNumber(phoneNumber: string): string {
-  // Remove all non-numeric characters
-  return phoneNumber.replace(/\D/g, "");
+  return phoneNumber.replace(/\D/g, '');
 }
 
 export function ProfileForm({ userData }: ProfileFormProps) {
@@ -195,6 +196,25 @@ export function ProfileForm({ userData }: ProfileFormProps) {
       // Update original phone if it was changed and verified
       if (verifiedPhone) {
         setOriginalPhone(verifiedPhone);
+      }
+      
+      // After saving, also update the user_hash in the profile
+      // This will also check for anonymous user entries and update them
+      if (userData?.id && formData.first_name && formData.last_name && formData.phone_number) {
+        try {
+          const hashResult = await updateUserProfileWithHash(
+            userData.id,
+            formData.first_name,
+            formData.last_name,
+            unformatPhoneNumber(formData.phone_number)
+          );
+          
+          if (!hashResult.success) {
+            console.error("Error updating user hash:", hashResult.error);
+          }
+        } catch (hashError) {
+          console.error("Exception updating user hash:", hashError);
+        }
       }
       
       toast.success("Profile updated successfully");

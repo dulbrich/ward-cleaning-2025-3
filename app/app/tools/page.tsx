@@ -1,7 +1,7 @@
 "use client";
 
 import { createClient } from "@/utils/supabase/client";
-import { Loader2 } from "lucide-react";
+import { AlertCircle, Loader2 } from "lucide-react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -15,6 +15,19 @@ const DynamicSyntaxHighlighter = dynamic(
   }),
   { ssr: false }
 );
+
+// Define Ward/Branch interface
+interface WardBranch {
+  id: string;
+  name: string;
+  unit_type: "Ward" | "Branch";
+  unit_number: string;
+  stake_district_name?: string;
+  city?: string;
+  state_province?: string;
+  country?: string;
+  is_primary: boolean;
+}
 
 // Code block with syntax highlighting component
 function CodeBlock({ code }: { code: string }) {
@@ -131,11 +144,14 @@ export default function WardContactImportPage() {
   const [trackedUsers, setTrackedUsers] = useState<{ new: number, existing: number }>({ new: 0, existing: 0 });
   const [message, setMessage] = useState<string>('');
   const [importProgress, setImportProgress] = useState<number | null>(null);
+  const [wardBranches, setWardBranches] = useState<WardBranch[]>([]);
+  const [selectedWard, setSelectedWard] = useState<string>("");
+  const [loadingWards, setLoadingWards] = useState(true);
   const router = useRouter();
   const supabase = createClient();
 
-  // JavaScript code to be copied
-  const scriptCode = `(function() {
+  // JavaScript code to be copied - will be dynamically updated with unit number
+  const [scriptCode, setScriptCode] = useState(`(function() {
   fetch('https://directory.churchofjesuschrist.org/api/v4/households?unit=2052520', {
     credentials: 'include'
   })
@@ -166,81 +182,127 @@ export default function WardContactImportPage() {
       URL.revokeObjectURL(url);
     })
     .catch(error => console.error('Error fetching the ward directory:', error));
-})();`;
+})();`);
 
+  // Fetch wards and ward data
   useEffect(() => {
     // Check for authentication
     const checkAuth = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
         setAuthError(true);
+        setLoadingWards(false);
         return;
       }
       
-      // Check for last import date in localStorage
-      const storedLastImport = localStorage.getItem('wardContactLastImport');
-      if (storedLastImport) {
-        setLastImportDate(storedLastImport);
-      }
-
-      // Also fetch last import from database
+      // Fetch wards from the database
       try {
-        const result = await getLastWardDataImport();
-        if (result.error) {
-          if (result.error === "Not authenticated") {
-            setAuthError(true);
-          } else {
-            console.error("Error fetching last import:", result.error);
+        const { data: wards, error } = await supabase
+          .from('ward_branches')
+          .select('*')
+          .order('is_primary', { ascending: false })
+          .order('name');
+          
+        if (error) throw error;
+        
+        setWardBranches(wards || []);
+        
+        // If we have wards, select the primary one by default
+        if (wards && wards.length > 0) {
+          const primaryWard = wards.find(ward => ward.is_primary);
+          setSelectedWard(primaryWard?.id || wards[0].id);
+          
+          // Update script code with the primary ward's unit number
+          if (primaryWard?.unit_number) {
+            updateScriptWithUnitNumber(primaryWard.unit_number);
           }
-          return;
         }
         
-        if (result.data) {
-          const dbImportDate = new Date(result.data.imported_at).toLocaleString();
-          if (!storedLastImport || new Date(result.data.imported_at) > new Date(storedLastImport)) {
-            setLastImportDate(dbImportDate);
-            localStorage.setItem('wardContactLastImport', dbImportDate);
-          }
+        // Check for last import date in localStorage
+        const storedLastImport = localStorage.getItem('wardContactLastImport');
+        if (storedLastImport) {
+          setLastImportDate(storedLastImport);
         }
-      } catch (err) {
-        console.error("Error fetching last import date:", err);
+  
+        // Also fetch last import from database
+        try {
+          const result = await getLastWardDataImport();
+          if (result.error) {
+            if (result.error === "Not authenticated") {
+              setAuthError(true);
+            } else {
+              console.error("Error fetching last import:", result.error);
+            }
+          } else if (result.data) {
+            const dbImportDate = new Date(result.data.imported_at).toLocaleString();
+            if (!storedLastImport || new Date(result.data.imported_at) > new Date(storedLastImport)) {
+              setLastImportDate(dbImportDate);
+              localStorage.setItem('wardContactLastImport', dbImportDate);
+            }
+          }
+        } catch (err) {
+          console.error("Error fetching last import date:", err);
+        }
+      } catch (error) {
+        console.error("Error fetching wards:", error);
+      } finally {
+        setLoadingWards(false);
       }
     };
 
     checkAuth();
   }, [supabase]);
 
-  // Add this inside the export default function WardContactImportPage component
-  // Add it near the beginning, before the handleFileChange function
-  // This sets up a debug function we can call from the browser console
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      window.debugAnonymousTracking = async () => {
-        try {
-          console.log("Starting debug anonymous tracking test...");
-          const testUser = {
-            firstName: "John",
-            lastName: "Smith",
-            phoneNumber: "555-123-4567"
-          };
-          
-          console.log(`Testing with user: ${testUser.firstName} ${testUser.lastName}`);
-          const result = await trackAnonymousUser(
-            testUser.firstName,
-            testUser.lastName,
-            testUser.phoneNumber
-          );
-          
-          console.log("Debug tracking result:", result);
-          alert(`Anonymous tracking test completed. Check console for details.\nResult: ${result.success ? 'Success' : 'Failed'}`);
-        } catch (err) {
-          console.error("Error in debug tracking:", err);
-          alert("Error testing anonymous tracking. See console for details.");
-        }
-      };
-    }
-  }, []);
+  // Update script with unit number
+  const updateScriptWithUnitNumber = (unitNumber: string) => {
+    const newScript = `(function() {
+  fetch('https://directory.churchofjesuschrist.org/api/v4/households?unit=${unitNumber}', {
+    credentials: 'include'
+  })
+    .then(response => {
+      if (!response.ok) {
+        throw new Error('Network response was not ok: ' + response.statusText);
+      }
+      return response.json();
+    })
+    .then(data => {
+      // Get today's date in YYYY-MM-DD format
+      const today = new Date().toISOString().split('T')[0];
+      const fileName = today + '.json';
+      
+      // Create a Blob from the JSON data
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      
+      // Create a temporary link to trigger the download
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      
+      // Clean up by removing the link and revoking the object URL
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    })
+    .catch(error => console.error('Error fetching the ward directory:', error));
+})();`;
+    setScriptCode(newScript);
+  };
 
+  // Handle ward selection change
+  const handleWardChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const selectedId = e.target.value;
+    setSelectedWard(selectedId);
+    
+    // Find the selected ward and update script with its unit number
+    const ward = wardBranches.find(w => w.id === selectedId);
+    if (ward?.unit_number) {
+      updateScriptWithUnitNumber(ward.unit_number);
+    }
+  };
+
+  // Modified handleFileChange
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       setFile(e.target.files[0]);
@@ -248,9 +310,15 @@ export default function WardContactImportPage() {
     }
   };
 
+  // Modified handleImport to include selected ward ID
   const handleImport = async () => {
     if (!file) {
       setError("Please select a file to import");
+      return;
+    }
+
+    if (!selectedWard) {
+      setError("Please select a ward/branch");
       return;
     }
 
@@ -265,6 +333,12 @@ export default function WardContactImportPage() {
       if (!session) {
         setAuthError(true);
         throw new Error("You must be logged in to import data");
+      }
+      
+      // Find the selected ward to get its unit number
+      const ward = wardBranches.find(w => w.id === selectedWard);
+      if (!ward) {
+        throw new Error("Selected ward not found");
       }
       
       // Read the file
@@ -300,6 +374,8 @@ export default function WardContactImportPage() {
                   if (member.phone) {
                     phoneCount++;
                     // This is a household head with a phone number - add to our list
+                    // Add unit_number to the member object
+                    member.unit_number = ward.unit_number;
                     allMembers.push(member);
                     console.log(`Found household head with phone: ${member.givenName} ${member.surname}`);
                   } else {
@@ -322,7 +398,11 @@ export default function WardContactImportPage() {
                   member.head === true && 
                   member.phone && 
                   (typeof member.phone === 'object' ? member.phone.number || member.phone.e164 : member.phone)
-                );
+                ).map((member: any) => {
+                  // Add unit_number to the member object
+                  member.unit_number = ward.unit_number;
+                  return member;
+                });
                 allMembers.push(...householdHeads);
               }
             }
@@ -335,7 +415,11 @@ export default function WardContactImportPage() {
               member.head === true && 
               member.phone && 
               (typeof member.phone === 'object' ? member.phone.number || member.phone.e164 : member.phone)
-            );
+            ).map((member: any) => {
+              // Add unit_number to the member object
+              member.unit_number = ward.unit_number;
+              return member;
+            });
             allMembers.push(...householdHeads);
           }
         }
@@ -353,6 +437,14 @@ export default function WardContactImportPage() {
       
       // Store in localStorage
       localStorage.setItem('wardContactData', JSON.stringify(jsonData));
+      
+      // Clear existing anonymous users for this ward unit number
+      try {
+        // We'll implement this in the backend actions later
+        console.log(`Clearing existing anonymous users for ward unit number: ${ward.unit_number}`);
+      } catch (clearError) {
+        console.error("Error clearing existing anonymous users:", clearError);
+      }
       
       // Start tracking anonymous users
       console.log("Starting anonymous user tracking.");
@@ -397,8 +489,8 @@ export default function WardContactImportPage() {
             console.log(`Tracking household head: ${firstName} ${lastName}`, 
                         phoneNumber ? `phone ending in: ${phoneNumber.slice(-4)}` : 'no phone');
             
-            // Track the anonymous user
-            const result = await trackAnonymousUser(firstName, lastName, phoneNumber);
+            // Track the anonymous user - adding unit number
+            const result = await trackAnonymousUser(firstName, lastName, phoneNumber, ward.unit_number);
             
             if (result.success) {
               trackedUsers.push({ firstName, lastName, result });
@@ -414,7 +506,7 @@ export default function WardContactImportPage() {
                 await new Promise(resolve => setTimeout(resolve, 1000));
                 
                 try {
-                  const retryResult = await trackAnonymousUser(firstName, lastName, phoneNumber);
+                  const retryResult = await trackAnonymousUser(firstName, lastName, phoneNumber, ward.unit_number);
                   if (retryResult.success) {
                     trackedUsers.push({ firstName, lastName, result: retryResult });
                     console.log(`Successfully tracked on retry: ${firstName} ${lastName}`);
@@ -446,8 +538,8 @@ export default function WardContactImportPage() {
       
       console.log(`Successfully tracked ${trackedUsers.length} household heads.`);
       
-      // Log the import
-      await logWardDataImport(allMembers.length);
+      // Log the import - include ward unit number
+      await logWardDataImport(allMembers.length, ward.unit_number);
       
       const trackedCount = {
         new: trackedUsers.length,
@@ -476,7 +568,8 @@ export default function WardContactImportPage() {
           phoneType: typeof sample.phone,
           phoneKeys: typeof sample.phone === 'object' ? Object.keys(sample.phone) : 'N/A',
           hasPhoneNumber: typeof sample.phone === 'object' ? !!sample.phone.number : 'N/A',
-          hasE164: typeof sample.phone === 'object' ? !!sample.phone.e164 : 'N/A'
+          hasE164: typeof sample.phone === 'object' ? !!sample.phone.e164 : 'N/A',
+          unitNumber: sample.unit_number
         });
       } else {
         console.log("No household heads found. Check the data structure.");
@@ -508,6 +601,32 @@ export default function WardContactImportPage() {
     );
   }
 
+  // No wards warning
+  if (!loadingWards && wardBranches.length === 0) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-3xl font-bold">Ward Contact Import Tool</h1>
+        
+        <div className="bg-amber-50 text-amber-800 p-6 rounded-lg border border-amber-200">
+          <h2 className="text-xl font-medium mb-2">No Wards or Branches Found</h2>
+          <div className="flex items-start gap-3 mb-4">
+            <AlertCircle className="w-5 h-5 mt-0.5 flex-shrink-0" />
+            <p>
+              You need to set up at least one ward or branch before using this tool. 
+              Please go to Settings to add your ward or branch information.
+            </p>
+          </div>
+          <button 
+            onClick={() => router.push('/app/settings')}
+            className="bg-primary text-primary-foreground hover:bg-primary/90 px-4 py-2 rounded-md text-sm font-medium"
+          >
+            Go to Settings
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-bold">Ward Contact Import Tool</h1>
@@ -522,6 +641,7 @@ export default function WardContactImportPage() {
           For tracking purposes only, a secure, anonymous hash of partial contact information is stored in the database.
           No personally identifiable information is retained in this process.
         </p>
+        
         {lastImportDate && (
           <div className="mt-4 text-sm p-3 bg-muted rounded-md">
             <strong>Last import:</strong> {lastImportDate}
@@ -532,6 +652,36 @@ export default function WardContactImportPage() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         <div className="bg-card rounded-lg border p-6 lg:col-span-7">
           <h2 className="text-xl font-medium mb-6">Step-by-Step Instructions</h2>
+          
+          <div className="mb-6">
+            <label htmlFor="selectedWard" className="block text-sm font-medium mb-2">
+              Select a Ward/Branch
+            </label>
+            {loadingWards ? (
+              <div className="flex items-center gap-2 h-9">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span className="text-sm text-muted-foreground">Loading wards...</span>
+              </div>
+            ) : (
+              <select
+                id="selectedWard"
+                value={selectedWard}
+                onChange={handleWardChange}
+                className="w-full px-3 py-2 border rounded-md"
+                disabled={wardBranches.length === 0}
+              >
+                {wardBranches.length === 0 ? (
+                  <option value="">No wards or branches available</option>
+                ) : (
+                  wardBranches.map(ward => (
+                    <option key={ward.id} value={ward.id}>
+                      {ward.name}{ward.is_primary ? ' (Primary)' : ''}
+                    </option>
+                  ))
+                )}
+              </select>
+            )}
+          </div>
           
           <InstructionStep 
             number={1} 
@@ -618,9 +768,9 @@ export default function WardContactImportPage() {
           ) : (
             <button
               onClick={handleImport}
-              disabled={!file}
+              disabled={!file || !selectedWard}
               className={`w-full px-4 py-2 rounded-md text-sm font-medium text-white ${
-                !file ? 'bg-primary/50 cursor-not-allowed' : 'bg-primary hover:bg-primary/90'
+                !file || !selectedWard ? 'bg-primary/50 cursor-not-allowed' : 'bg-primary hover:bg-primary/90'
               }`}
             >
               Import Contacts

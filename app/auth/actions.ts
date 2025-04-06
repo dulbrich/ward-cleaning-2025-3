@@ -1,6 +1,6 @@
 "use server";
 
-import { generateAnonymousHash } from "@/app/app/tools/actions";
+import { generateUserHash } from "@/app/app/tools/actions";
 import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
 
@@ -14,7 +14,7 @@ export async function signUp(formData: FormData) {
 
   const supabase = await createClient();
 
-  const { error } = await supabase.auth.signUp({
+  const { data: signUpData, error } = await supabase.auth.signUp({
     email,
     password,
     options: {
@@ -31,12 +31,20 @@ export async function signUp(formData: FormData) {
     return { error: error.message };
   }
 
-  // Check if this user was previously imported by generating the anonymous hash
-  if (firstName && lastName) {
+  // Generate the user hash for this new user
+  if (firstName && lastName && phoneNumber && signUpData.user) {
     try {
-      const userHash = await generateAnonymousHash(firstName, lastName, phoneNumber);
+      // Clean the phone number and generate hash
+      const cleanPhoneNumber = phoneNumber.replace(/\D/g, '');
+      const userHash = await generateUserHash(firstName, lastName, cleanPhoneNumber);
       
-      // Check if the hash exists in anonymous_users table
+      // Update the user_profiles table with the generated hash
+      await supabase
+        .from('user_profiles')
+        .update({ user_hash: userHash })
+        .eq('id', signUpData.user.id);
+      
+      // Check if this hash exists in anonymous_users table
       const { data: existingUser, error: lookupError } = await supabase
         .from('anonymous_users')
         .select('id, user_type')
@@ -46,41 +54,35 @@ export async function signUp(formData: FormData) {
       if (lookupError) {
         console.error("Error looking up anonymous user during signup:", lookupError);
       } else if (existingUser) {
-        // Get the authenticated user
-        const { data: { user } } = await supabase.auth.getUser();
-        
-        if (user) {
-          if (existingUser.user_type === 'imported') {
-            // Update the existing record to mark as registered
-            await supabase
-              .from('anonymous_users')
-              .update({ 
-                user_type: 'registered',
-                registered_at: new Date().toISOString(),
-                registered_user_id: user.id
-              })
-              .eq('id', existingUser.id);
-          }
-        }
-      } else {
-        // This user wasn't imported before - create a new anonymous record
-        const { data: { user } } = await supabase.auth.getUser();
-        
-        if (user) {
+        // Update the existing anonymous user to mark as registered
+        if (existingUser.user_type !== 'registered') {
           await supabase
             .from('anonymous_users')
-            .insert([{ 
-              user_hash: userHash,
+            .update({ 
               user_type: 'registered',
               registered_at: new Date().toISOString(),
-              registered_user_id: user.id,
-              import_count: 0
-            }]);
+              registered_user_id: signUpData.user.id
+            })
+            .eq('id', existingUser.id);
         }
+      } else {
+        // No existing anonymous record - create one if needed
+        await supabase
+          .from('anonymous_users')
+          .insert([{ 
+            user_hash: userHash,
+            user_type: 'registered',
+            first_import_at: new Date().toISOString(),
+            last_import_at: new Date().toISOString(),
+            registered_at: new Date().toISOString(),
+            registered_user_id: signUpData.user.id,
+            import_count: 0,
+            unit_number: ''
+          }]);
       }
     } catch (err) {
-      console.error("Error tracking anonymous user during signup:", err);
-      // Don't fail registration if tracking fails
+      console.error("Error updating user hash during signup:", err);
+      // Don't fail registration if hash handling fails
     }
   }
 

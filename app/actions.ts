@@ -1,6 +1,6 @@
 "use server";
 
-import { generateAnonymousHash } from "@/app/app/tools/actions";
+import { generateUserHash } from "@/app/app/tools/actions";
 import { createClient } from "@/utils/supabase/server";
 import { encodedRedirect } from "@/utils/utils";
 import { headers } from "next/headers";
@@ -47,12 +47,31 @@ export const signUpAction = async (formData: FormData): Promise<string> => {
   if (error) {
     console.error(error.code + " " + error.message);
     return encodedRedirect("error", "/sign-up", error.message);
-  } else {
-    // Check if this user was previously imported by generating the anonymous hash
+  } else if (data?.user) {
     try {
-      const userHash = generateAnonymousHash(firstName, lastName, phoneNumber);
+      // Generate the user hash for linking with anonymous users
+      const cleanPhoneNumber = phoneNumber.replace(/\D/g, '');
+      const userHash = await generateUserHash(firstName, lastName, cleanPhoneNumber);
       
-      // Check if the hash exists in anonymous_users table
+      // First, update the user_profiles table with the hash
+      const { error: profileError } = await supabase
+        .from('user_profiles')
+        .upsert({
+          user_id: data.user.id,
+          user_hash: userHash,
+          // Include other profile fields to ensure they're set
+          first_name: firstName,
+          last_name: lastName,
+          phone_number: phoneNumber,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        });
+        
+      if (profileError) {
+        console.error("Error updating user profile with hash:", profileError);
+      }
+      
+      // Check if this hash exists in anonymous_users table
       const { data: existingUser, error: lookupError } = await supabase
         .from('anonymous_users')
         .select('id, user_type')
@@ -62,37 +81,44 @@ export const signUpAction = async (formData: FormData): Promise<string> => {
       if (lookupError) {
         console.error("Error looking up anonymous user during signup:", lookupError);
       } else if (existingUser) {
-        // Get the authenticated user
-        const { data: { user } } = await supabase.auth.getUser();
-        
-        if (user && existingUser.user_type === 'imported') {
-          // Update the existing record to mark as registered
+        // Update the existing anonymous user to mark as registered
+        if (existingUser.user_type !== 'registered') {
           await supabase
             .from('anonymous_users')
             .update({ 
               user_type: 'registered',
               registered_at: new Date().toISOString(),
-              registered_user_id: user.id
+              registered_user_id: data.user.id
             })
             .eq('id', existingUser.id);
         }
-      } else if (data?.user) {
-        // This user wasn't imported before - create a new anonymous record
+      } else {
+        // No existing anonymous record - create one
         await supabase
           .from('anonymous_users')
           .insert([{ 
             user_hash: userHash,
             user_type: 'registered',
+            first_import_at: new Date().toISOString(),
+            last_import_at: new Date().toISOString(),
             registered_at: new Date().toISOString(),
             registered_user_id: data.user.id,
-            import_count: 0
+            import_count: 0,
+            unit_number: ''
           }]);
       }
     } catch (err) {
-      console.error("Error tracking anonymous user during signup:", err);
-      // Don't fail registration if tracking fails
+      console.error("Error updating user hash during signup:", err);
+      // Don't fail registration if hash handling fails
     }
     
+    return encodedRedirect(
+      "success",
+      "/sign-up",
+      "Thanks for signing up! Please check your email for a verification link.",
+    );
+  } else {
+    // Handle the case where signup succeeded but no user data was returned
     return encodedRedirect(
       "success",
       "/sign-up",

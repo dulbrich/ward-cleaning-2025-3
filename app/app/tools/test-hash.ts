@@ -1,20 +1,17 @@
 "use server";
 
-import { generateAnonymousHash } from "./actions";
+import { generateUserHash } from "./actions";
 
-export async function calculateTestHash() {
-  const firstName = "David";
-  const lastName = "Ulbrich";
-  const phoneNumber = "801-971-9802";
-  
-  const hash = await generateAnonymousHash(firstName, lastName, phoneNumber);
-  
-  return {
-    input: {
-      firstName,
-      lastName,
-      phoneNumber
-    },
-    hash
-  };
+export async function testHash(firstName: string, lastName: string, phoneNumber: string) {
+  try {
+    // Generate the hash
+    const hash = await generateUserHash(firstName, lastName, phoneNumber);
+    
+    return { success: true, hash };
+  } catch (error) {
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : "Unknown error generating hash" 
+    };
+  }
 } 

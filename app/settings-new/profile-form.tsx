@@ -1,5 +1,6 @@
 "use client";
 
+import { updateUserProfileWithHash } from "@/app/app/tools/actions";
 import { FormEvent, useState } from "react";
 import InputMask from "react-input-mask";
 
@@ -118,6 +119,24 @@ export function ProfileForm({ userData }: ProfileFormProps) {
       });
 
       if (response.ok) {
+        // Also update the user hash
+        if (userData?.id) {
+          try {
+            const hashResult = await updateUserProfileWithHash(
+              userData.id,
+              formData.first_name,
+              formData.last_name,
+              unformatPhoneNumber(formData.phone_number)
+            );
+            
+            if (!hashResult.success) {
+              console.error("Error updating user hash:", hashResult.error);
+            }
+          } catch (hashError) {
+            console.error("Exception updating user hash:", hashError);
+          }
+        }
+        
         setStatusMessage("Profile updated successfully!");
       } else {
         setStatusMessage("Failed to update profile. Please try again.");
