@@ -10,6 +10,7 @@ This document specifies the implementation of the Schedule tab in the applicatio
 - Provide multiple viewing options (list, calendar, text/email)
 - Display participants for each cleaning day
 - Allow customization of cleaning times
+- Provide options to remove individual or all cleaning schedules when needed
 
 ## User Interface Components
 
@@ -38,6 +39,12 @@ This document specifies the implementation of the Schedule tab in the applicatio
 ### Edit Cleaning Dialog
 - Form to modify date, time, and assigned group for a specific cleaning day
 - Save and Cancel buttons
+- Delete button to remove individual schedule entries
+
+### Schedule Management
+- "Clear All" button to delete all schedules for a ward/branch 
+- Confirmation dialogs for both individual deletions and clearing all schedules
+- Warning messages indicating that deletions cannot be undone
 
 ## User Data Integration
 
@@ -159,6 +166,16 @@ To optimize performance when generating schedules:
 - Users can modify the time for any scheduled cleaning day after generation
 - Users can manually override group assignments if needed
 
+### Schedule Deletion
+- Users can delete individual schedule entries when mistakes are made
+- Users can clear all schedules for a ward/branch with a "Clear All" button
+- Both deletion actions require confirmation through a dialog that:
+  - Shows an alert icon
+  - Provides clear warning text
+  - Indicates the deletion cannot be undone
+  - Shows the schedule details that will be deleted
+  - Offers cancel and confirm options
+
 ### Ward Member Integration
 - System retrieves ward member data from wardContactData in localStorage
 - Participants are grouped by the first letter of their last name
@@ -275,6 +292,11 @@ EXECUTE FUNCTION update_cleaning_schedules_updated_at();
 - Deletes a specific cleaning schedule entry
 - Returns: Success message
 
+### DELETE `/api/cleaning-schedules`
+- Deletes all cleaning schedules for a specific ward/branch
+- Query parameters: `ward_branch_id`
+- Returns: Success message with count of deleted entries
+
 ## Display Views
 
 ### Calendar View
@@ -318,4 +340,5 @@ EXECUTE FUNCTION update_cleaning_schedules_updated_at();
 - Implement responsive design for mobile compatibility
 - Cache schedule data for performance
 - Implement error handling for all API requests
-- Add loading states for async operations 
+- Add loading states for async operations
+- Implement confirmation dialogs for destructive actions with clear warnings 
