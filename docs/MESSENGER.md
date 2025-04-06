@@ -200,3 +200,168 @@ The system will replace the following tokens in message templates:
 - Ensure proper sanitization of data before using in SMS templates
 - Implement secure handling of the Do Not Contact list to ensure privacy
 - Regularly sync the Do Not Contact list to ensure it's up-to-date 
+
+## Database Structure
+
+### Tables and Relationships
+
+#### Do Not Contact List
+The system uses the `do_not_contact` table to track members who have opted out of receiving messages:
+
+```sql
+CREATE TABLE IF NOT EXISTS do_not_contact (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_hash TEXT NOT NULL,
+  marked_by UUID,
+  marked_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  FOREIGN KEY (marked_by) REFERENCES auth.users(id) ON DELETE SET NULL
+);
+
+-- Enable Row Level Security
+ALTER TABLE do_not_contact ENABLE ROW LEVEL SECURITY;
+
+-- Allow authenticated users to view do not contact list
+CREATE POLICY "Authenticated users can view do not contact list" 
+  ON do_not_contact 
+  FOR SELECT 
+  USING (auth.role() = 'authenticated');
+
+-- Allow authenticated users to add to do not contact list
+CREATE POLICY "Authenticated users can insert do not contact records" 
+  ON do_not_contact 
+  FOR INSERT 
+  WITH CHECK (auth.role() = 'authenticated');
+```
+
+- The `user_hash` field stores a unique identifier for the ward member
+- The system filters out all members whose `user_hash` appears in this table, regardless of other filter criteria
+- The `marked_by` field references the authenticated user who added the member to the list
+- Timestamps are maintained for auditing purposes
+- Row Level Security ensures only authenticated users can access this sensitive data
+
+#### Anonymous Users Table
+The system tracks both imported contacts and registered users in the `anonymous_users` table:
+
+```sql
+CREATE TABLE IF NOT EXISTS anonymous_users (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_hash TEXT UNIQUE NOT NULL,
+  user_type TEXT NOT NULL DEFAULT 'imported',
+  first_import_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  last_import_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  import_count INTEGER DEFAULT 1,
+  registered_at TIMESTAMP WITH TIME ZONE,
+  registered_user_id UUID REFERENCES auth.users(id),
+  unit_number CHARACTER VARYING,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+```
+
+- Members imported from ward.json initially have `user_type = 'imported'`
+- When a member registers, their record is updated to `user_type = 'registered'`
+- The `registered_user_id` field links to their auth.users entry
+- The `user_hash` provides a consistent identifier across imports
+- The `unit_number` associates the user with a specific ward/branch
+
+#### Campaigns Table
+The system stores message templates in the `campaigns` table, which are used for sending personalized messages:
+
+```sql
+CREATE TABLE IF NOT EXISTS campaigns (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  content TEXT NOT NULL,
+  is_default BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Create index on user_id for faster lookups
+CREATE INDEX IF NOT EXISTS idx_campaigns_user_id ON campaigns(user_id);
+
+-- Enable Row Level Security
+ALTER TABLE campaigns ENABLE ROW LEVEL SECURITY;
+
+-- Allow users to view only their own campaigns
+CREATE POLICY "Users can view their own campaigns" 
+  ON campaigns 
+  FOR SELECT 
+  USING (auth.uid() = user_id);
+
+-- Create function to ensure only one default campaign per user
+CREATE OR REPLACE FUNCTION ensure_single_default_campaign()
+RETURNS TRIGGER AS $$
+BEGIN
+  -- If setting a campaign as default
+  IF NEW.is_default = TRUE THEN
+    -- Update any existing default campaigns to not be default
+    UPDATE campaigns 
+    SET is_default = FALSE 
+    WHERE user_id = NEW.user_id 
+      AND id != NEW.id 
+      AND is_default = TRUE;
+  END IF;
+  
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Create trigger to ensure only one default campaign per user
+CREATE TRIGGER single_default_campaign_trigger
+BEFORE INSERT OR UPDATE ON campaigns
+FOR EACH ROW
+EXECUTE FUNCTION ensure_single_default_campaign();
+```
+
+- Each campaign is associated with a user via the `user_id` field
+- Campaigns contain a `name` for identification and `content` that holds the message template
+- The `is_default` field marks a campaign as the default selection in the Messenger interface
+- A trigger ensures that only one campaign can be default per user
+- Row Level Security ensures users can only access their own campaigns
+- Campaigns support personalization tokens like `{first}`, `{last}`, `{group}`, and `{schedule}`
+
+### Integration Flow
+
+1. **Contact Import Process**:
+   - When importing contacts from ward.json, each member gets a `user_hash` derived from their name and phone number
+   - Members are inserted into `anonymous_users` with `user_type = 'imported'`
+   - Import tracking fields (`first_import_at`, `last_import_at`, `import_count`) are updated
+
+2. **Registration Association**:
+   - When a user registers, the system attempts to match them with an existing `anonymous_users` record
+   - If matched, the record is updated with `user_type = 'registered'`, `registered_at` timestamp, and `registered_user_id`
+   - This creates a link between the authenticated user and their imported contact record
+
+3. **Campaign Template Management**:
+   - Users create message templates in the Campaigns interface
+   - Templates are stored in the `campaigns` table associated with the user's ID
+   - One campaign can be marked as default per user via the `is_default` field
+   - The trigger `ensure_single_default_campaign` maintains this constraint automatically
+
+4. **Messenger Contact Filtering**:
+   - The system queries `anonymous_users` to determine which contacts have registered
+   - It checks the `do_not_contact` table to exclude opted-out members
+   - When "Non-Users Only" filter is active, only contacts with `user_type = 'imported'` are shown
+   - Contacts with matching entries in the `do_not_contact` table are never displayed
+
+5. **Message Personalization Process**:
+   - The selected campaign template is retrieved from the `campaigns` table
+   - For each contact, tokens in the template are replaced with personalized data:
+     - `{first}` and `{last}` are derived from the contact's displayName
+     - `{group}` is determined by alphabetical assignment
+     - `{schedule}` is derived from the cleaning schedule
+   - The personalized message is prepared for sending via SMS
+
+6. **User Registration Status**:
+   - Members with `user_type = 'registered'` receive automated communications through the app
+   - Members with `user_type = 'imported'` receive manual SMS messages initiated by ward leaders
+
+### Database Security
+
+- Row Level Security (RLS) policies restrict data access to authenticated users
+- Users can only access contacts within their own ward/unit
+- The do_not_contact list is enforced at the query level to prevent accidental messaging
+- Records in the anonymous_users table are associated with specific units to maintain data separation 
