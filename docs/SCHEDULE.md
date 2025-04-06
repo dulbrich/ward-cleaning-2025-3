@@ -1,97 +1,321 @@
-# Ward Cleaning Schedule Tab Specification
+# Building Cleaning Schedule Specification
 
-## 1. Introduction
+## Overview
+This document specifies the implementation of the Schedule tab in the application. The primary purpose of this feature is to create and manage schedules for ward building cleanings by selecting date ranges and assigning groups to Saturdays. The schedule feature provides various viewing options and helps ward leaders organize cleaning assignments efficiently.
 
-This document outlines the specifications for the "Schedule" tab within the ward management application. The primary purpose of this section is to allow users to easily generate, view, manage, and share cleaning schedules for their assigned ward(s) or branch(es).
+## Purpose
+- Enable users to create and manage cleaning schedules for their ward buildings
+- Automatically assign groups to Saturdays based on simple user inputs
+- Support multiple wards/branches with separate schedules
+- Provide multiple viewing options (list, calendar, text/email)
+- Display participants for each cleaning day
+- Allow customization of cleaning times
 
-## 2. Goals
+## User Interface Components
 
-*   Provide a simple interface for selecting the months a ward is responsible for building cleaning.
-*   Automate the generation of cleaning assignments based on a standard rotation logic.
-*   Allow customization of cleaning times, both globally and for individual assignments.
-*   Offer multiple views (List, Calendar, Text) for schedule consumption.
-*   Enable easy sharing of the schedule (e.g., via email).
-*   Support users managing multiple wards/branches.
-*   Display the list of members assigned to each cleaning day, respecting do-not-contact preferences.
+### Ward Selection
+- Dropdown to select between multiple wards/branches (if user has more than one)
+- Only appears if the user has multiple wards/branches
 
-## 3. Features / User Stories
+### Schedule Configuration
+- Date range selector to specify which months the ward is responsible for cleaning
+- Default cleaning time input (defaults to 9:00 AM)
+- Button to generate/update schedule
 
-### 3.1. Schedule Generation
+### View Selection
+- Toggle between different views:
+  - Calendar View: Monthly calendar showing all scheduled cleanings
+  - List View: Chronological list of all scheduled cleanings
+  - Text/Email View: Formatted text suitable for copying to emails/messages
 
-*   **As a user, I want to select the year and the specific months my ward is responsible for building cleaning.**
-    *   The UI should present a way to select a year.
-    *   For the selected year, the user can check/uncheck boxes corresponding to each month.
-*   **As a user, I want the application to automatically generate the cleaning schedule for the selected months.**
-    *   The system will identify all Saturdays within the selected months.
-    *   **Grouping Logic:**
-        *   The ward membership will be divided into four (4) groups based on the first letter of the last name (Assumption: Standard grouping is A-F, G-L, M-R, S-Z. *See Open Questions*).
-        *   The first Saturday of the ward's cleaning block (could span multiple consecutive months) will be assigned to Group 1 (A-F).
-        *   The second Saturday to Group 2 (G-L).
-        *   The third Saturday to Group 3 (M-R).
-        *   The fourth Saturday to Group 4 (S-Z).
-        *   This rotation repeats for subsequent blocks of four Saturdays within the selected months.
-        *   **5th Saturday Logic:** If a month selected for cleaning contains a fifth Saturday, the *entire* ward membership (excluding `do_not_contact`) is assigned to clean on that day.
-*   **As a user, I want the default cleaning time to be 9:00 AM on Saturdays.**
-*   **As a user, I want to be able to change the default cleaning start time for all generated assignments.**
-    *   A setting should be available (perhaps near the month selection or in general settings) to modify this default time. Changing it should ideally update future generations or offer to update existing schedules.
-*   **As a user, I want to modify the start time for a specific cleaning day after the schedule has been generated.**
-    *   Each assignment in the List or Calendar view should allow for editing its specific time.
+### Schedule Display
+- Shows all scheduled cleaning days with:
+  - Date and time
+  - Assigned group(s)
+  - List of participants (excluding those in do_not_contact table)
+- Edit button to modify individual cleaning days
 
-### 3.2. Schedule Viewing
+### Edit Cleaning Dialog
+- Form to modify date, time, and assigned group for a specific cleaning day
+- Save and Cancel buttons
 
-*   **As a user, I want to view the generated schedule in different formats.**
-    *   **List View:** A chronological list showing Date, Start Time, Assigned Group (or "Entire Ward").
-    *   **Calendar View:** A standard monthly calendar interface highlighting Saturdays with cleaning assignments. Clicking on a highlighted day could show details (Time, Group).
-    *   **Text View:** A simple, pre-formatted text output summarizing the schedule (e.g., "Sat, Oct 5th, 9:00 AM: Group 1 (A-F)
-Sat, Oct 12th, 9:00 AM: Group 2 (G-L)...").
-*   **As a user, I want a button to easily copy the Text View content to my clipboard.**
-    *   A "Copy to Clipboard" button should accompany the Text View.
+## User Data Integration
 
-### 3.3. Member Assignment Details
+### Data Sources
+The schedule feature integrates with several existing data sources:
 
-*   **As a user, when viewing a specific cleaning assignment (e.g., clicking in List/Calendar view or in a dedicated detail section), I want to see the list of members assigned.**
-    *   If a group is assigned, list all members belonging to that group (based on last name).
-    *   If "Entire Ward" is assigned, list all members.
-    *   **Exclusion:** Members listed in the `do_not_contact` table **must not** appear in these lists. Member data is sourced from `wardContactData` in local storage.
+1. **wardContactData** (localStorage)
+   - JSON data imported from ward exports (ward.json)
+   - Contains household and member information
+   - Primary source for participant names and contact details
+   - Stored structure includes households with members, each containing:
+     - name/displayName
+     - phone information
+     - positions
+     - head (boolean)
 
-### 3.4. Multi-Ward Support
+2. **user_profiles** (database table)
+   - Contains information about registered application users
+   - Links to auth.users table for authentication
 
-*   **As a user managing multiple wards/branches, I want to select which ward's schedule I am currently viewing and managing.**
-    *   The application should check `wardContactData` (local storage) for the list of available wards/branches associated with the user (referencing the `ward_branches` table structure/concept).
-    *   A dropdown or similar selector should be prominently displayed, likely at the top of the Schedule tab, allowing the user to switch between wards.
-    *   Selecting a ward will load/display the schedule associated with that specific ward. Schedule generation and viewing actions will apply to the currently selected ward.
+3. **anonymous_users** (database table)
+   - Tracks both imported contacts and registered users
+   - Structure:
+     ```sql
+     id UUID PRIMARY KEY
+     user_hash TEXT UNIQUE NOT NULL
+     user_type TEXT NOT NULL DEFAULT 'imported'
+     registered_user_id UUID REFERENCES auth.users(id)
+     unit_number CHARACTER VARYING
+     ```
+   - Provides mapping between imported contacts and registered users
+   - The hash ties anonymous (imported) users to registered users
 
-## 4. UI/UX Considerations
+4. **do_not_contact** (database table)
+   - Stores hashed identifiers of users who should not be contacted
+   - Structure:
+     ```sql
+     id UUID PRIMARY KEY
+     user_hash TEXT NOT NULL
+     marked_by UUID
+     marked_at TIMESTAMP WITH TIME ZONE
+     ```
+   - Used to filter out members from participant lists
 
-*   **Clarity:** The interface should clearly distinguish between schedule generation controls (year/month selection, default time) and schedule viewing options (List, Calendar, Text tabs).
-*   **Feedback:** Provide clear visual feedback when the schedule is generated or updated. Indicate loading states if data fetching takes time.
-*   **Editing:** Make inline editing of individual assignment times intuitive.
-*   **Responsiveness:** The views should adapt reasonably to different screen sizes.
+### Hashing Mechanism
+The application uses a hashing mechanism to create consistent identifiers for ward members:
 
-## 5. Data Model
+1. **Hash Generation**
+   - Created from member data when importing ward.json
+   - Uses a combination of name, phone, and/or email
+   - Ensures the same person gets the same hash across imports
+   - Used to track imported contacts before they register
 
-*   **Existing Data:**
-    *   `wardContactData` (Local Storage): Source for ward list (for multi-ward selector) and member details (names, contact info, last names for grouping). Format resembles `@ward.json`.
-    *   `do_not_contact` (Database Table): Contains identifiers for members who should be excluded from assignment lists. Needs a clear key to match against `wardContactData`.
-    *   `ward_branches` (Database Table): Likely contains identifiers and names for wards/branches, used to populate the multi-ward selector based on user permissions/associations derived initially into `wardContactData`.
-*   **New Data / Storage:**
-    *   A persistent storage mechanism is needed for the generated schedules. This could be:
-        *   **New Database Table(s):**
-            *   `schedules` (schedule_id PK, ward_branch_id FK, year, default_start_time)
-            *   `schedule_assignments` (assignment_id PK, schedule_id FK, assignment_date, start_time, assigned_group_name) - `assigned_group_name` could be "Group 1", "Group 2", ..., "Entire Ward".
-        *   **Local Storage:** Storing the generated schedule JSON directly in local storage, perhaps keyed by ward/branch ID and year. Simpler, but less robust and not easily shareable across user devices/sessions unless synced. Database storage is recommended for persistence and potential future features.
-    *   The exact grouping definition (e.g., A-F, G-L, etc.) needs to be stored or defined, potentially configurable per ward.
+2. **User Identification Flow**
+   - When displaying participants:
+     1. Retrieve members from wardContactData
+     2. Generate a hash for each member
+     3. Check if hash exists in anonymous_users
+     4. If registered_user_id is present, link to user_profiles
+     5. Check if hash exists in do_not_contact (to exclude)
 
-## 6. Non-Functional Requirements
+3. **Participant Filtering Process**
+   - Group members by last name first letter
+   - Generate hash for each member
+   - Query do_not_contact table to exclude flagged members
+   - For each remaining member:
+     - Check anonymous_users to determine if registered
+     - Display appropriate contact information based on status
 
-*   **Performance:** Schedule generation and view switching should be reasonably fast, even for wards with many members. Fetching member lists for specific days should not block the UI excessively.
-*   **Accuracy:** Date calculations (identifying Saturdays, handling month boundaries) must be accurate. Group assignments must correctly follow the defined logic.
+### Implementation Details
+When implementing the participant list functionality:
 
-## 7. Open Questions / Assumptions
+1. **Processing wardContactData**
+   - Parse the JSON structure to extract member information
+   - Group by last name's first letter (A-F, G-L, M-R, S-Z)
+   - For each member, generate a user hash using the same algorithm used in the import process
 
-1.  **Grouping Definition:** Is the standard A-F, G-L, M-R, S-Z grouping acceptable, or does this need to be configurable per ward? How should edge cases (e.g., hyphenated names, names not starting with A-Z) be handled?
-2.  **Data Synchronization:** How up-to-date is the `wardContactData` in local storage expected to be? How are updates to membership or the `do_not_contact` list reflected in already generated schedules? (Suggestion: Re-filtering the member list display on view is likely sufficient, rather than regenerating the core assignment).
-3.  **Historical Data:** Is there a need to view schedules from past years? If so, how far back?
-4.  **Schedule Conflicts:** The current spec doesn't handle potential conflicts (e.g., stake events). Is this out of scope?
-5.  **Notifications:** Is there a requirement to notify members of their assignments? (Likely out of scope for this specific tab, potentially handled by a separate "Messenger" feature).
-6.  **Persistence Choice:** Confirm the preferred method for storing generated schedules (Database recommended). 
+2. **Checking do_not_contact status**
+   - Query the do_not_contact table with the generated hashes
+   - Exclude any members whose hash appears in the results
+
+3. **Determining user type**
+   - Query the anonymous_users table with the generated hashes
+   - For matches:
+     - If user_type = 'registered' and registered_user_id is present:
+       - Use user_profiles data for display
+     - If user_type = 'imported':
+       - Use wardContactData information for display
+
+4. **Displaying contact information**
+   - For registered users: Follow privacy preferences from user_profiles
+   - For imported users: Display based on wardContactData
+
+### Participants Batch Processing
+To optimize performance when generating schedules:
+
+1. Extract all potential participants from wardContactData
+2. Generate hashes for all members in a single batch
+3. Query anonymous_users and do_not_contact tables with all hashes at once
+4. Process the results to create filtered group assignments
+5. Store these assignments with the schedule for quick retrieval
+
+## Functionality Requirements
+
+### Group Assignment Logic
+- Ward members are divided into 4 groups based on the first letter of last name
+- For a month where the ward is responsible for cleaning:
+  - Each group is assigned to one Saturday (Group A - 1st Saturday, Group B - 2nd Saturday, etc.)
+  - If there is a 5th Saturday in a month, the entire ward is assigned to that day
+
+### Schedule Generation
+1. User selects month(s) the ward is responsible for cleaning
+2. User sets default cleaning time (defaults to 9:00 AM)
+3. System identifies all Saturdays within the selected months
+4. System assigns groups to Saturdays following the assignment logic
+5. Schedule is generated and displayed
+
+### Schedule Modification
+- Users can modify the time for any scheduled cleaning day after generation
+- Users can manually override group assignments if needed
+
+### Ward Member Integration
+- System retrieves ward member data from wardContactData in localStorage
+- Participants are grouped by the first letter of their last name
+- Members in the do_not_contact table are excluded from participant lists
+
+### Multi-Ward Support
+- If a user has multiple wards in the ward_branches table, they can switch between ward schedules
+- Each ward maintains its own independent schedule
+
+## Data Models
+
+### Schedule Table
+```sql
+CREATE TABLE IF NOT EXISTS cleaning_schedules (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  ward_branch_id UUID NOT NULL REFERENCES ward_branches(id) ON DELETE CASCADE,
+  cleaning_date DATE NOT NULL,
+  cleaning_time TIME NOT NULL DEFAULT '09:00:00',
+  assigned_group TEXT NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(ward_branch_id, cleaning_date)
+);
+
+-- Enable RLS on the table
+ALTER TABLE cleaning_schedules ENABLE ROW LEVEL SECURITY;
+
+-- Allow users to view schedules for wards they belong to
+CREATE POLICY "Users can view cleaning schedules" 
+  ON cleaning_schedules 
+  FOR SELECT 
+  USING (
+    ward_branch_id IN (
+      SELECT id FROM ward_branches WHERE user_id = auth.uid()
+    )
+  );
+
+-- Allow users to insert schedules for wards they belong to
+CREATE POLICY "Users can insert cleaning schedules" 
+  ON cleaning_schedules 
+  FOR INSERT 
+  WITH CHECK (
+    ward_branch_id IN (
+      SELECT id FROM ward_branches WHERE user_id = auth.uid()
+    )
+  );
+
+-- Allow users to update schedules for wards they belong to
+CREATE POLICY "Users can update cleaning schedules" 
+  ON cleaning_schedules 
+  FOR UPDATE 
+  USING (
+    ward_branch_id IN (
+      SELECT id FROM ward_branches WHERE user_id = auth.uid()
+    )
+  );
+
+-- Allow users to delete schedules for wards they belong to
+CREATE POLICY "Users can delete cleaning schedules" 
+  ON cleaning_schedules 
+  FOR DELETE 
+  USING (
+    ward_branch_id IN (
+      SELECT id FROM ward_branches WHERE user_id = auth.uid()
+    )
+  );
+
+-- Add trigger to update the updated_at timestamp
+CREATE OR REPLACE FUNCTION update_cleaning_schedules_updated_at() 
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW; 
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER update_cleaning_schedules_modtime
+BEFORE UPDATE ON cleaning_schedules
+FOR EACH ROW
+EXECUTE FUNCTION update_cleaning_schedules_updated_at();
+```
+
+## API Endpoints
+
+### GET `/api/cleaning-schedules`
+- Retrieves all cleaning schedules for a specific ward/branch
+- Query parameters: `ward_branch_id`, `start_date`, `end_date`
+- Returns: List of cleaning schedule entries
+
+### POST `/api/cleaning-schedules/generate`
+- Generates a new schedule based on specified parameters
+- Request body:
+  ```json
+  {
+    "ward_branch_id": "uuid",
+    "months": ["2025-04", "2025-05"],
+    "default_time": "09:00:00"
+  }
+  ```
+- Returns: Generated schedule entries
+
+### PUT `/api/cleaning-schedules/:id`
+- Updates a specific cleaning schedule entry
+- Request body:
+  ```json
+  {
+    "cleaning_time": "10:00:00",
+    "assigned_group": "Group A"
+  }
+  ```
+- Returns: Updated schedule entry
+
+### DELETE `/api/cleaning-schedules/:id`
+- Deletes a specific cleaning schedule entry
+- Returns: Success message
+
+## Display Views
+
+### Calendar View
+- Monthly calendar showing all cleaning days
+- Color-coded by assigned group
+- Hover or click for additional details
+
+### List View
+- Chronological list of all cleaning days
+- Each entry shows:
+  - Date (formatted as "Saturday, April 5, 2025")
+  - Time
+  - Assigned group
+  - Expandable list of participants
+
+### Text/Email View
+- Formatted text suitable for copying to email or messages
+- Includes all essential information
+- "Copy to Clipboard" button
+- Preview of how the text will appear
+
+## Member Grouping Logic
+
+### Group Assignment
+- Group A: Last names starting with A-F
+- Group B: Last names starting with G-L
+- Group C: Last names starting with M-R
+- Group D: Last names starting with S-Z
+- Whole Ward: All members for 5th Saturdays
+
+### Participant List
+- For each cleaning day, retrieve and display the list of ward members in the assigned group
+- Exclude members who are in the do_not_contact table
+- Sort by last name
+- Display name and phone number
+
+## Implementation Notes
+- Use React state management to handle schedule data
+- Implement date manipulation with a library like date-fns
+- Use a calendar component for the calendar view
+- Implement responsive design for mobile compatibility
+- Cache schedule data for performance
+- Implement error handling for all API requests
+- Add loading states for async operations 
