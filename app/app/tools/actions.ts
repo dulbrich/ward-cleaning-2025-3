@@ -226,28 +226,43 @@ export async function trackAnonymousUser(
  * @returns A hash string based on the user's information
  */
 export async function generateUserHash(firstName: string, lastName: string, phoneNumber: string): Promise<string> {
-  // Normalize the inputs to avoid case sensitivity and formatting differences
-  const normalizedFirst = firstName.toLowerCase().trim();
-  const normalizedLast = lastName.toLowerCase().trim();
-  const normalizedPhone = phoneNumber.replace(/\D/g, ''); // Remove non-digits
-  
-  // Create a combined string for hashing
-  const combinedString = `${normalizedFirst}|${normalizedLast}|${normalizedPhone}`;
-  
-  // Use crypto to create a SHA-256 hash
-  const encoder = new TextEncoder();
-  const data = encoder.encode(combinedString);
-  
-  // Create a simple hash function since crypto might not be available in all environments
-  let hash = 0;
-  for (let i = 0; i < data.length; i++) {
-    const char = data[i];
-    hash = ((hash << 5) - hash) + char;
-    hash = hash & hash; // Convert to 32bit integer
+  try {
+    // Normalize inputs
+    const normalizedFirst = firstName.toLowerCase().trim();
+    const normalizedLast = lastName.toLowerCase().trim();
+    const normalizedPhone = phoneNumber.replace(/\D/g, ''); // Remove non-digits
+    
+    // Create a combined string for hashing
+    const combinedString = `${normalizedFirst}|${normalizedLast}|${normalizedPhone}`;
+    
+    // Use the createHash function for SHA-256 hashing (imported from crypto)
+    const hash = createHash('sha256').update(combinedString).digest('hex');
+    
+    return hash;
+  } catch (error) {
+    console.error("Error generating user hash:", error);
+    
+    // Fallback to the old algorithm if crypto fails
+    const normalizedFirst = firstName.toLowerCase().trim();
+    const normalizedLast = lastName.toLowerCase().trim();
+    const normalizedPhone = phoneNumber.replace(/\D/g, '');
+    
+    const combinedString = `${normalizedFirst}|${normalizedLast}|${normalizedPhone}`;
+    
+    // Create a simple hash function since crypto might not be available in all environments
+    const encoder = new TextEncoder();
+    const data = encoder.encode(combinedString);
+    
+    let hash = 0;
+    for (let i = 0; i < data.length; i++) {
+      const char = data[i];
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // Convert to 32bit integer
+    }
+    
+    // Convert to hex string and ensure it's always positive
+    return Math.abs(hash).toString(16).padStart(8, '0');
   }
-  
-  // Convert to hex string and ensure it's always positive
-  return Math.abs(hash).toString(16).padStart(8, '0');
 }
 
 /**

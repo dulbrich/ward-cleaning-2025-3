@@ -1,6 +1,6 @@
 "use server";
 
-import { generateUserHash } from "@/app/app/tools/actions";
+import { createAnonymousIdentifier } from "@/app/app/tools/actions";
 import { createClient } from "@/utils/supabase/server";
 import { revalidatePath } from "next/cache";
 
@@ -51,8 +51,12 @@ export async function checkDoNotContactStatus(contacts: Contact[]): Promise<Cont
       const firstName = nameParts[0] || '';
       const lastName = nameParts.length > 1 ? nameParts[nameParts.length - 1] : '';
       
-      // Generate hash for this contact
-      const userHash = await generateUserHash(firstName, lastName, contact.phone);
+      // Clean phone number before hash generation
+      const cleanPhone = contact.phone.replace(/\D/g, '');
+      
+      // Generate hash for this contact using createAnonymousIdentifier
+      // which uses the first 3 letters of first name + first 3 letters of last name + last 4 of phone
+      const userHash = await createAnonymousIdentifier(firstName, lastName, cleanPhone);
       
       // Track hashes for collision detection
       if (!hashMap[userHash]) {
@@ -80,42 +84,57 @@ export async function checkDoNotContactStatus(contacts: Contact[]): Promise<Cont
     }
     
     // Check which hashes are in do_not_contact table (only need the hash field)
-    const { data: doNotContactData, error: doNotContactError } = await supabase
-      .from('do_not_contact')
-      .select('user_hash')
-      .in('user_hash', userHashes);
+    // Split into batches if there are many hashes to avoid query size limits
+    const batchSize = 100;
+    const doNotContactHashes = new Set<string>();
+    
+    for (let i = 0; i < userHashes.length; i += batchSize) {
+      const hashBatch = userHashes.slice(i, i + batchSize);
       
-    if (doNotContactError) {
-      console.error("Error fetching do_not_contact status:", doNotContactError);
-      return contactsWithHashes;
+      const { data: doNotContactData, error: doNotContactError } = await supabase
+        .from('do_not_contact')
+        .select('user_hash')
+        .in('user_hash', hashBatch);
+        
+      if (doNotContactError) {
+        console.error("Error fetching do_not_contact status:", doNotContactError);
+        continue;
+      }
+      
+      // Add hashes to the set
+      doNotContactData?.forEach(item => doNotContactHashes.add(item.user_hash));
     }
     
-    // Create a set of do-not-contact hashes for quick lookup
-    const doNotContactHashes = new Set(doNotContactData?.map(item => item.user_hash) || []);
     console.log(`Found ${doNotContactHashes.size} contacts marked as do-not-contact`);
     
     // Check which hashes are in anonymous_users table
-    const { data: anonymousUsersData, error: anonymousUsersError } = await supabase
-      .from('anonymous_users')
-      .select('user_hash, user_type')
-      .in('user_hash', userHashes);
-      
-    if (anonymousUsersError) {
-      console.error("Error fetching anonymous_users data:", anonymousUsersError);
-    }
+    const userTypeMap = new Map<string, string>();
     
-    // Create a map of user types by hash
-    const userTypeMap = new Map();
-    anonymousUsersData?.forEach(item => {
-      userTypeMap.set(item.user_hash, item.user_type);
-    });
+    for (let i = 0; i < userHashes.length; i += batchSize) {
+      const hashBatch = userHashes.slice(i, i + batchSize);
+      
+      const { data: anonymousUsersData, error: anonymousUsersError } = await supabase
+        .from('anonymous_users')
+        .select('user_hash, user_type')
+        .in('user_hash', hashBatch);
+        
+      if (anonymousUsersError) {
+        console.error("Error fetching anonymous_users data:", anonymousUsersError);
+        continue;
+      }
+      
+      // Add user types to the map
+      anonymousUsersData?.forEach(item => {
+        userTypeMap.set(item.user_hash, item.user_type);
+      });
+    }
     
     // Add do-not-contact and user type information to contacts
     return contactsWithHashes.map(contact => {
       if (!contact.userHash) return contact;
       
       const doNotContact = doNotContactHashes.has(contact.userHash);
-      const userType = userTypeMap.get(contact.userHash) || 'unknown';
+      const userType = userTypeMap.get(contact.userHash) as 'imported' | 'registered' | 'unknown' || 'unknown';
       
       return {
         ...contact,
@@ -137,7 +156,7 @@ export async function toggleDoNotContactStatus(
   doNotContact: boolean
 ): Promise<{ success: boolean; message: string }> {
   try {
-    if (!contact.name || !contact.phone || !contact.userHash) {
+    if (!contact.name || !contact.phone) {
       return { 
         success: false, 
         message: "Insufficient contact data" 
@@ -155,12 +174,29 @@ export async function toggleDoNotContactStatus(
       };
     }
     
+    // If userHash is not provided, generate it
+    let userHash = contact.userHash;
+    
+    if (!userHash) {
+      // Extract first and last name
+      const nameParts = contact.name.split(' ');
+      const firstName = nameParts[0] || '';
+      const lastName = nameParts.length > 1 ? nameParts[nameParts.length - 1] : '';
+      
+      // Clean phone number
+      const cleanPhone = contact.phone.replace(/\D/g, '');
+      
+      // Generate hash consistently using createAnonymousIdentifier
+      userHash = await createAnonymousIdentifier(firstName, lastName, cleanPhone);
+      console.log(`Generated hash for ${contact.name}: ${userHash}`);
+    }
+    
     if (doNotContact) {
       // Add to do_not_contact table - storing only the hash, no PII
       const { error } = await supabase
         .from('do_not_contact')
         .insert([{
-          user_hash: contact.userHash,
+          user_hash: userHash,
           marked_by: user.id,
           marked_at: new Date().toISOString()
         }]);
@@ -177,7 +213,7 @@ export async function toggleDoNotContactStatus(
       const { error } = await supabase
         .from('do_not_contact')
         .delete()
-        .eq('user_hash', contact.userHash);
+        .eq('user_hash', userHash);
         
       if (error) {
         console.error("Error removing from do_not_contact:", error);

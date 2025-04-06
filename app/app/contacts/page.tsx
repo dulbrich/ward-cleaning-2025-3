@@ -238,7 +238,7 @@ export default function ContactsPage() {
       return;
     }
 
-    if (!contact.name || !contact.phone || !contact.userHash) {
+    if (!contact.name || !contact.phone) {
       toast.error("Cannot update contact: Missing required information");
       return;
     }
@@ -246,7 +246,7 @@ export default function ContactsPage() {
     const newStatus = !contact.doNotContact;
     console.log(`Toggling ${contact.name} to do-not-contact: ${newStatus}`);
     
-    setProcessingContact(contact.userHash);
+    setProcessingContact(contact.userHash || null);
     
     try {
       // This only sends the hash to the database, not name or phone details
@@ -255,52 +255,30 @@ export default function ContactsPage() {
       if (result.success) {
         console.log(`Server update successful for ${contact.name}, updating UI state`);
         
-        // Create completely new contact objects to force React re-render
-        const updatedContacts = contacts.map(c => {
-          if (c.userHash === contact.userHash) {
-            console.log(`Found matching contact to update: ${c.name}, setting doNotContact to ${newStatus}`);
-            // Create a completely new object
-            return {
-              ...c,
-              doNotContact: newStatus,
-              // Add a timestamp to force React to see this as a new object
-              _updated: Date.now()
-            };
-          }
-          return c;
-        });
-        
-        // Update filtered contacts the same way
-        const updatedFilteredContacts = filteredContacts.map(c => {
-          if (c.userHash === contact.userHash) {
-            return {
-              ...c,
-              doNotContact: newStatus,
-              _updated: Date.now()
-            };
-          }
-          return c;
-        });
-        
-        // First reset state, then set the new state after a tiny delay
-        // This helps React recognize the change
-        setContacts([]);
-        setFilteredContacts([]);
-        
-        // Use setTimeout to ensure the component actually sees this as two separate updates
-        setTimeout(() => {
-          setContacts([...updatedContacts]);
-          setFilteredContacts([...updatedFilteredContacts]);
+        // After updating in the database, refresh all contacts to get the latest status
+        try {
+          // Fetch all contacts with updated do-not-contact status
+          const refreshedContacts = await checkDoNotContactStatus(contacts);
+          console.log(`Refreshed ${refreshedContacts.length} contacts with latest do-not-contact status`);
           
-          // Re-initialize fuse with updated data
-          if (fuse) {
-            const fuseOptions = {
-              keys: ['name', 'email', 'phone', 'role'],
-              threshold: 0.3,
-              includeScore: true
-            };
-            setFuse(new Fuse(updatedContacts, fuseOptions));
+          // Update the contacts state with the refreshed data
+          setContacts(refreshedContacts);
+          
+          // Update filtered contacts maintaining search filter if active
+          if (searchQuery && fuse) {
+            const results = fuse.search(searchQuery);
+            setFilteredContacts(results.map(result => result.item));
+          } else {
+            setFilteredContacts(refreshedContacts);
           }
+          
+          // Re-initialize search with fresh data
+          const fuseOptions = {
+            keys: ['name', 'email', 'phone', 'role'],
+            threshold: 0.3,
+            includeScore: true
+          };
+          setFuse(new Fuse(refreshedContacts, fuseOptions));
           
           const successMessage = newStatus 
             ? `Contact ${contact.name} marked as 'Do Not Contact'` 
@@ -308,7 +286,34 @@ export default function ContactsPage() {
           
           console.log(successMessage);
           toast.success(successMessage);
-        }, 10);
+        } catch (refreshError) {
+          console.error("Error refreshing contacts after toggle:", refreshError);
+          
+          // Fall back to updating state locally if refresh fails
+          const updatedContacts = contacts.map(c => {
+            if (c.userHash === contact.userHash) {
+              return { ...c, doNotContact: newStatus };
+            }
+            return c;
+          });
+          
+          const updatedFilteredContacts = filteredContacts.map(c => {
+            if (c.userHash === contact.userHash) {
+              return { ...c, doNotContact: newStatus };
+            }
+            return c;
+          });
+          
+          setContacts(updatedContacts);
+          setFilteredContacts(updatedFilteredContacts);
+          
+          // Still show success message since the database was updated
+          const successMessage = newStatus 
+            ? `Contact ${contact.name} marked as 'Do Not Contact'` 
+            : `Contact ${contact.name} removed from 'Do Not Contact' list`;
+          
+          toast.success(successMessage);
+        }
       } else {
         console.error(`Error toggling do-not-contact for ${contact.name}:`, result.message);
         toast.error(`Error: ${result.message}`);
