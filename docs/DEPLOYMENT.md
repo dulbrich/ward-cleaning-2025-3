@@ -16,6 +16,7 @@ This guide outlines the steps to deploy the Ward Cleaning application to Vercel 
 2. Click "Add New..." → "Project"
 3. Find and select your `ward-cleaning-2025-3` repository
 4. Vercel will detect the Next.js application automatically
+5. `git config --global user.email "your-github-email@example.com"`
 
 ### 2. Configure Environment Variables
 
