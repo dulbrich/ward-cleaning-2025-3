@@ -24,7 +24,7 @@ export default function Header() {
           Learn More
         </a>
         <a 
-          href="/sign-up" 
+          href="/coming-soon" 
           className="px-6 py-3 bg-secondary text-secondary-foreground rounded-md font-medium hover:bg-secondary/80 transition-colors"
         >
           Get Started

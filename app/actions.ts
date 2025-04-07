@@ -1,5 +1,6 @@
 "use server";
 
+import { generateUserHash } from "@/app/app/tools/actions";
 import { createClient } from "@/utils/supabase/server";
 import { encodedRedirect } from "@/utils/utils";
 import { headers } from "next/headers";
@@ -8,6 +9,9 @@ import { redirect } from "next/navigation";
 export const signUpAction = async (formData: FormData): Promise<string> => {
   const email = formData.get("email")?.toString();
   const password = formData.get("password")?.toString();
+  const firstName = formData.get("firstName")?.toString();
+  const lastName = formData.get("lastName")?.toString();
+  const phoneNumber = formData.get("phoneNumber")?.toString();
   const supabase = await createClient();
   const origin = (await headers()).get("origin");
 
@@ -19,18 +23,102 @@ export const signUpAction = async (formData: FormData): Promise<string> => {
     );
   }
 
+  if (!firstName || !lastName || !phoneNumber) {
+    return encodedRedirect(
+      "error",
+      "/sign-up",
+      "First name, last name, and phone number are required",
+    );
+  }
+
   const { error, data } = await supabase.auth.signUp({
     email,
     password,
     options: {
       emailRedirectTo: `${origin}/auth/callback`,
+      data: {
+        first_name: firstName,
+        last_name: lastName,
+        phone_number: phoneNumber,
+      },
     },
   });
 
   if (error) {
     console.error(error.code + " " + error.message);
     return encodedRedirect("error", "/sign-up", error.message);
+  } else if (data?.user) {
+    try {
+      // Generate the user hash for linking with anonymous users
+      const cleanPhoneNumber = phoneNumber.replace(/\D/g, '');
+      const userHash = await generateUserHash(firstName, lastName, cleanPhoneNumber);
+      
+      // First, update the user_profiles table with the hash
+      const { error: profileError } = await supabase
+        .from('user_profiles')
+        .upsert({
+          user_id: data.user.id,
+          user_hash: userHash,
+          // Include other profile fields to ensure they're set
+          first_name: firstName,
+          last_name: lastName,
+          phone_number: phoneNumber,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        });
+        
+      if (profileError) {
+        console.error("Error updating user profile with hash:", profileError);
+      }
+      
+      // Check if this hash exists in anonymous_users table
+      const { data: existingUser, error: lookupError } = await supabase
+        .from('anonymous_users')
+        .select('id, user_type')
+        .eq('user_hash', userHash)
+        .maybeSingle();
+        
+      if (lookupError) {
+        console.error("Error looking up anonymous user during signup:", lookupError);
+      } else if (existingUser) {
+        // Update the existing anonymous user to mark as registered
+        if (existingUser.user_type !== 'registered') {
+          await supabase
+            .from('anonymous_users')
+            .update({ 
+              user_type: 'registered',
+              registered_at: new Date().toISOString(),
+              registered_user_id: data.user.id
+            })
+            .eq('id', existingUser.id);
+        }
+      } else {
+        // No existing anonymous record - create one
+        await supabase
+          .from('anonymous_users')
+          .insert([{ 
+            user_hash: userHash,
+            user_type: 'registered',
+            first_import_at: new Date().toISOString(),
+            last_import_at: new Date().toISOString(),
+            registered_at: new Date().toISOString(),
+            registered_user_id: data.user.id,
+            import_count: 0,
+            unit_number: ''
+          }]);
+      }
+    } catch (err) {
+      console.error("Error updating user hash during signup:", err);
+      // Don't fail registration if hash handling fails
+    }
+    
+    return encodedRedirect(
+      "success",
+      "/sign-up",
+      "Thanks for signing up! Please check your email for a verification link.",
+    );
   } else {
+    // Handle the case where signup succeeded but no user data was returned
     return encodedRedirect(
       "success",
       "/sign-up",
@@ -144,7 +232,7 @@ export const signInAction = async (formData: FormData) => {
     return redirect("/onboarding");
   }
 
-  return redirect("/protected");
+  return redirect("/app");
 };
 
 export const forgotPasswordAction = async (formData: FormData) => {
@@ -159,7 +247,7 @@ export const forgotPasswordAction = async (formData: FormData) => {
   }
 
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${origin}/auth/callback?redirect_to=/protected/reset-password`,
+    redirectTo: `${origin}/auth/callback?redirect_to=/app/reset-password`,
   });
 
   if (error) {
@@ -196,7 +284,7 @@ export const resetPasswordAction = async (formData: FormData): Promise<string> =
   if (!password || !confirmPassword) {
     return encodedRedirect(
       "error",
-      "/protected/reset-password",
+      "/app/reset-password",
       "Password and confirm password are required",
     );
   }
@@ -204,7 +292,7 @@ export const resetPasswordAction = async (formData: FormData): Promise<string> =
   if (password !== confirmPassword) {
     return encodedRedirect(
       "error",
-      "/protected/reset-password",
+      "/app/reset-password",
       "Passwords do not match",
     );
   }
@@ -216,12 +304,12 @@ export const resetPasswordAction = async (formData: FormData): Promise<string> =
   if (error) {
     return encodedRedirect(
       "error",
-      "/protected/reset-password",
+      "/app/reset-password",
       "Password update failed",
     );
   }
 
-  return encodedRedirect("success", "/protected/reset-password", "Password updated");
+  return encodedRedirect("success", "/app/reset-password", "Password updated");
 };
 
 export const signOutAction = async () => {
