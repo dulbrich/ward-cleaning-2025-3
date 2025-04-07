@@ -2,31 +2,32 @@
 
 import { Button } from "@/components/ui/button";
 import {
-    Card,
-    CardContent,
-    CardFooter,
-    CardHeader,
-    CardTitle
+  Card,
+  CardContent,
+  CardFooter,
+  CardHeader,
+  CardTitle
 } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuTrigger
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createClient } from "@/utils/supabase/client";
+import { format, parse, parseISO } from "date-fns";
 import {
-    Check,
-    CheckCircle2,
-    ChevronDown,
-    MessageSquare,
-    RefreshCw,
-    Search,
-    Star,
-    X
+  Check,
+  CheckCircle2,
+  ChevronDown,
+  MessageSquare,
+  RefreshCw,
+  Search,
+  Star,
+  X
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -63,6 +64,15 @@ const GROUP_OPTIONS = [
   { value: "T-Z", label: "Group T-Z" }
 ];
 
+// Add cleaning schedule interface
+interface CleaningSchedule {
+  id: string;
+  ward_branch_id: string;
+  cleaning_date: string;
+  cleaning_time: string;
+  assigned_group: string;
+}
+
 export default function MessengerPage() {
   const [contacts, setContacts] = useState<ContactWithMessagingInfo[]>([]);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
@@ -73,6 +83,7 @@ export default function MessengerPage() {
   const [loadingContacts, setLoadingContacts] = useState(true);
   const [loadingCampaigns, setLoadingCampaigns] = useState(true);
   const [previewContact, setPreviewContact] = useState<ContactWithMessagingInfo | null>(null);
+  const [nextSchedule, setNextSchedule] = useState<CleaningSchedule | null>(null);
 
   const supabase = createClient();
 
@@ -248,6 +259,65 @@ export default function MessengerPage() {
     loadContactsFromWardData();
   }, []);
 
+  // Load next scheduled cleaning on mount
+  useEffect(() => {
+    const fetchNextCleaning = async () => {
+      try {
+        // Fetch user to get ward branch
+        const { data: { user } } = await supabase.auth.getUser();
+        
+        if (!user) return;
+        
+        // Get user's ward branches
+        const { data: wardBranches } = await supabase
+          .from('ward_branches')
+          .select('id')
+          .eq('user_id', user.id);
+        
+        if (!wardBranches || wardBranches.length === 0) return;
+        
+        // Get current date as ISO string
+        const today = new Date();
+        const todayISO = format(today, 'yyyy-MM-dd');
+        
+        // Fetch next cleaning schedule (first one after today)
+        const { data, error } = await supabase
+          .from('cleaning_schedules')
+          .select('*')
+          .in('ward_branch_id', wardBranches.map(wb => wb.id))
+          .gte('cleaning_date', todayISO)
+          .order('cleaning_date')
+          .limit(1);
+        
+        if (error) throw error;
+        
+        // If we found a schedule, set it and update the group filter
+        if (data && data.length > 0) {
+          const schedule = data[0];
+          setNextSchedule(schedule);
+          
+          // Auto-select the group based on the assignment
+          if (schedule.assigned_group === 'All') {
+            setSelectedGroupFilter('all');
+          } else {
+            // Map the assigned group to our filter format
+            const groupMapping: Record<string, string> = {
+              'Group A': 'A-F',
+              'Group B': 'G-M',
+              'Group C': 'N-S',
+              'Group D': 'T-Z'
+            };
+            setSelectedGroupFilter(groupMapping[schedule.assigned_group] || 'all');
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching next cleaning schedule:", error);
+      }
+    };
+    
+    fetchNextCleaning();
+  }, []);
+
   // Filter contacts based on current filters
   const filteredContacts = useMemo(() => {
     return contacts.filter(contact => {
@@ -345,15 +415,24 @@ export default function MessengerPage() {
     // Replace group
     message = message.replace(/{group}/g, contact.group);
     
-    // Replace schedule - assume it's the next Saturday at 9 AM
-    const nextSaturday = getNextSaturday();
-    const schedule = `${nextSaturday.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })} at 9:00 AM`;
-    message = message.replace(/{schedule}/g, schedule);
+    // Replace schedule - use next scheduled cleaning if available, otherwise fallback to next Saturday
+    let scheduleText;
+    if (nextSchedule) {
+      const date = parseISO(nextSchedule.cleaning_date);
+      const timeString = nextSchedule.cleaning_time.substring(0, 5); // Get HH:MM format
+      const time = format(parse(timeString, 'HH:mm', new Date()), 'h:mm a');
+      scheduleText = `${format(date, 'EEEE, MMMM d, yyyy')} at ${time}`;
+    } else {
+      const nextSaturday = getNextSaturday();
+      scheduleText = `${nextSaturday.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })} at 9:00 AM`;
+    }
+    
+    message = message.replace(/{schedule}/g, scheduleText);
     
     return message;
   };
 
-  // Get next Saturday date
+  // Get next Saturday date (fallback)
   const getNextSaturday = (): Date => {
     const now = new Date();
     const day = now.getDay(); // 0 is Sunday, 6 is Saturday

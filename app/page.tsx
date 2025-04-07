@@ -1,4 +1,5 @@
 import Hero from "@/components/hero";
+import Image from "next/image";
 
 export default async function Home() {
   return (
@@ -97,14 +98,14 @@ export default async function Home() {
             </ul>
           </div>
           <div className="md:w-1/2">
-            <div className="relative h-[400px] rounded-lg overflow-hidden border bg-primary/10">
-              <div className="absolute inset-0 flex items-center justify-center text-primary/50">
-                <svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round">
-                  <rect width="18" height="18" x="3" y="3" rx="2" ry="2"></rect>
-                  <line x1="3" x2="21" y1="9" y2="9"></line>
-                  <line x1="9" x2="9" y1="21" y2="9"></line>
-                </svg>
-              </div>
+            <div className="relative h-[400px] rounded-lg overflow-hidden border">
+              <Image 
+                src="/images/app-example-2.png"
+                alt="Ward Cleaning App interface example"
+                fill
+                className="object-cover"
+                priority
+              />
             </div>
           </div>
         </div>
@@ -195,7 +196,7 @@ export default async function Home() {
           Join wards across the country who are using the Ward Cleaning App
         </p>
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
-          <a href="/sign-up" className="px-6 py-3 bg-primary text-primary-foreground rounded-md font-medium hover:opacity-90 transition-opacity">
+          <a href="/coming-soon" className="px-6 py-3 bg-primary text-primary-foreground rounded-md font-medium hover:opacity-90 transition-opacity">
             Get Started
           </a>
           <a href="/contact" className="px-6 py-3 bg-secondary text-secondary-foreground rounded-md font-medium hover:bg-secondary/80 transition-colors">
