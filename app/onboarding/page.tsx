@@ -1,5 +1,7 @@
 "use client";
 
+export const dynamic = 'force-dynamic';
+
 import { FormMessage } from "@/components/form-message";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -8,9 +10,10 @@ import { Label } from "@/components/ui/label";
 import { OnboardingFormData, OnboardingStep } from "@/types";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 
-export default function OnboardingPage() {
+// Client component to handle search params
+function OnboardingContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [loading, setLoading] = useState(false);
@@ -608,5 +611,14 @@ export default function OnboardingPage() {
         </>
       )}
     </div>
+  );
+}
+
+// Main component with Suspense
+export default function OnboardingPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <OnboardingContent />
+    </Suspense>
   );
 } 

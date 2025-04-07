@@ -1,47 +1,88 @@
 "use client";
 
+export const dynamic = 'force-dynamic';
+
 import { forgotPasswordAction } from "@/app/actions";
 import { FormMessage } from "@/components/form-message";
-import { SubmitButton } from "@/components/submit-button";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { Suspense } from "react";
 import { SmtpMessage } from "../smtp-message";
 
-export default function ForgotPassword() {
+// Import useSearchParams inside the client component
+import { useSearchParams } from "next/navigation";
+
+// Client component to handle search params
+function ForgotPasswordContent() {
   const searchParams = useSearchParams();
-  
-  // Extract message from search params
-  const messageType = searchParams.get('type');
-  const messageContent = searchParams.get('message');
-  
-  const searchParamsMessage = messageType && messageContent 
-    ? { type: messageType, message: messageContent } 
-    : null;
-    
+  const message = searchParams?.get("message");
+  const type = searchParams?.get("type");
+
   return (
-    <>
-      <form className="flex-1 flex flex-col w-full gap-2 text-foreground [&>input]:mb-6 min-w-64 max-w-64 mx-auto">
-        <div>
-          <h1 className="text-2xl font-medium">Reset Password</h1>
-          <p className="text-sm text-secondary-foreground">
-            Already have an account?{" "}
-            <Link className="text-primary underline" href="/sign-in">
-              Sign in
-            </Link>
-          </p>
+    <div className="mx-auto flex w-full flex-col justify-center space-y-6 sm:w-[350px]">
+      <div className="flex flex-col space-y-2 text-center">
+        <h1 className="text-2xl font-semibold tracking-tight">
+          Forgot Password
+        </h1>
+        <p className="text-sm text-muted-foreground">
+          Enter your email address and we'll send you a link to reset your
+          password.
+        </p>
+      </div>
+
+      <div className="grid gap-6">
+        <FormMessage
+          message={
+            type && message
+              ? {
+                  [type === "error" ? "error" : "success"]: message,
+                }
+              : null
+          }
+        />
+
+        <form action={forgotPasswordAction}>
+          <div className="grid gap-4">
+            <div className="grid gap-2">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                name="email"
+                placeholder="name@example.com"
+                type="email"
+                autoCapitalize="none"
+                autoComplete="email"
+                autoCorrect="off"
+                required
+              />
+            </div>
+            <SmtpMessage />
+            <Button type="submit" className="w-full">
+              Send Reset Link
+            </Button>
+          </div>
+        </form>
+
+        <div className="text-center text-sm">
+          <Link
+            href="/sign-in"
+            className="underline underline-offset-4 hover:text-primary"
+          >
+            Back to sign in
+          </Link>
         </div>
-        <div className="flex flex-col gap-2 [&>input]:mb-3 mt-8">
-          <Label htmlFor="email">Email</Label>
-          <Input name="email" placeholder="you@example.com" required />
-          <SubmitButton formAction={forgotPasswordAction}>
-            Reset Password
-          </SubmitButton>
-          {searchParamsMessage && <FormMessage message={searchParamsMessage} />}
-        </div>
-      </form>
-      <SmtpMessage />
-    </>
+      </div>
+    </div>
+  );
+}
+
+// Main component with Suspense
+export default function ForgotPassword() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <ForgotPasswordContent />
+    </Suspense>
   );
 }

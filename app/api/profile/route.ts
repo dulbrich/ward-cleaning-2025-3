@@ -85,13 +85,18 @@ export async function PUT(request: Request) {
       );
     }
     
+    // Initialize currentUser
+    let currentUser: any = null;
+    
     // Check if this is an admin operation and if user has permission
     if (role && role !== "user") {
-      const { data: currentUser } = await supabase
+      const { data: userData } = await supabase
         .from("user_profiles")
         .select("role")
         .eq("user_id", user.id)
         .single();
+      
+      currentUser = userData;
       
       if (!currentUser || currentUser.role !== "admin") {
         return NextResponse.json(

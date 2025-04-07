@@ -20,12 +20,19 @@ const nextConfig: NextConfig = {
     // your project has ESLint errors.
     ignoreDuringBuilds: true,
   },
+  // Use production mode with server-side rendering
   output: 'standalone',
+  // Complete disable static optimization
   experimental: {
-    // This actually turns off static optimization, instead of turning it on
-    // which helps prevent build-time auth issues
+    // This actually turns off static optimization
     appDocumentPreloading: false,
   },
+  // Config for external packages
+  serverExternalPackages: ['@sentry/nextjs'],
+  // Force all pages to be server-side rendered
+  // This is much more compatible with auth-based pages
+  reactStrictMode: false,
+  staticPageGenerationTimeout: 1000,
   images: {
     remotePatterns: [
       {
