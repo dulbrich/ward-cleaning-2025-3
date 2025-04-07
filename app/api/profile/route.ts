@@ -1,26 +1,26 @@
-import { createClient } from "@/lib/supabase/server";
-import { auth } from "@clerk/nextjs";
+import { createClient } from "@/utils/supabase/server";
 import { NextResponse } from "next/server";
 
 // GET /api/profile - Get the current user's profile
 export async function GET() {
   try {
-    const { userId } = auth();
+    const supabase = await createClient();
     
-    if (!userId) {
+    // Get the authenticated user
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    
+    if (authError || !user) {
       return NextResponse.json(
         { error: "Unauthorized" },
         { status: 401 }
       );
     }
 
-    const supabase = createClient();
-    
     // Query user profile from database
     const { data, error } = await supabase
       .from("user_profiles")
       .select("*")
-      .eq("user_id", userId)
+      .eq("user_id", user.id)
       .single();
     
     if (error) {
@@ -51,9 +51,12 @@ export async function GET() {
 // PUT /api/profile - Update the current user's profile
 export async function PUT(request: Request) {
   try {
-    const { userId } = auth();
+    const supabase = await createClient();
     
-    if (!userId) {
+    // Get the authenticated user
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    
+    if (authError || !user) {
       return NextResponse.json(
         { error: "Unauthorized" },
         { status: 401 }
@@ -82,14 +85,12 @@ export async function PUT(request: Request) {
       );
     }
     
-    const supabase = createClient();
-    
     // Check if this is an admin operation and if user has permission
     if (role && role !== "user") {
       const { data: currentUser } = await supabase
         .from("user_profiles")
         .select("role")
-        .eq("user_id", userId)
+        .eq("user_id", user.id)
         .single();
       
       if (!currentUser || currentUser.role !== "admin") {
@@ -101,7 +102,7 @@ export async function PUT(request: Request) {
     }
     
     // Prepare update data
-    const updateData = {
+    const updateData: any = {
       first_name,
       last_name,
       username,
@@ -119,7 +120,7 @@ export async function PUT(request: Request) {
     const { data, error } = await supabase
       .from("user_profiles")
       .update(updateData)
-      .eq("user_id", userId)
+      .eq("user_id", user.id)
       .select()
       .single();
     

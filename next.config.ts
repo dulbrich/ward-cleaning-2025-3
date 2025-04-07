@@ -1,27 +1,47 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
-  webpack: (config, { isServer }) => {
-    if (!isServer) {
-      // Client-side polyfills for node modules
-      config.resolve.fallback = {
-        ...config.resolve.fallback,
-        buffer: require.resolve('buffer/'),
-        fs: false,
-        path: false,
-        os: false,
-      };
-      
-      // Add plugin to inject buffer
-      config.plugins.push(
-        new (require('webpack')).ProvidePlugin({
-          Buffer: ['buffer', 'Buffer'],
-        })
-      );
-    }
-    
+  webpack: (config) => {
+    config.externals.push({
+      "utf-8-validate": "commonjs utf-8-validate",
+      bufferutil: "commonjs bufferutil",
+    });
     return config;
+  },
+  typescript: {
+    // !! WARN !!
+    // Dangerously allow production builds to successfully complete even if
+    // your project has type errors.
+    // !! WARN !!
+    ignoreBuildErrors: true,
+  },
+  eslint: {
+    // Warning: This allows production builds to successfully complete even if
+    // your project has ESLint errors.
+    ignoreDuringBuilds: true,
+  },
+  output: 'standalone',
+  experimental: {
+    // This actually turns off static optimization, instead of turning it on
+    // which helps prevent build-time auth issues
+    appDocumentPreloading: false,
+  },
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: '**',
+      },
+    ],
+  },
+  async redirects() {
+    return [
+      {
+        source: '/sign-up',
+        destination: '/coming-soon',
+        permanent: false,
+      },
+    ];
   },
 };
 

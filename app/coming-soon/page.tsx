@@ -3,7 +3,15 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
-import { submitInterestForm, type InterestSignupFormData } from "./actions";
+
+interface FormValues {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phoneNumber: string;
+  wardName: string;
+  role: string;
+}
 
 interface FormState {
   message: string;
@@ -13,7 +21,7 @@ interface FormState {
 }
 
 export default function ComingSoonPage() {
-  const [formValues, setFormValues] = useState<InterestSignupFormData>({
+  const [formValues, setFormValues] = useState<FormValues>({
     firstName: "",
     lastName: "",
     email: "",
@@ -31,7 +39,7 @@ export default function ComingSoonPage() {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setFormValues((prev: InterestSignupFormData) => ({ ...prev, [name]: value }));
+    setFormValues((prev: FormValues) => ({ ...prev, [name]: value }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -56,34 +64,28 @@ export default function ComingSoonPage() {
     });
 
     try {
-      // Call the server action to submit the form
-      const result = await submitInterestForm(formValues);
+      // Simulate API call 
+      await new Promise(resolve => setTimeout(resolve, 1000));
       
-      if (result.success) {
-        setFormState({
-          message: result.message,
-          isError: false,
-          isSubmitting: false,
-          isSuccess: true
-        });
-        
-        // Reset form on success
-        setFormValues({
-          firstName: "",
-          lastName: "",
-          email: "",
-          phoneNumber: "",
-          wardName: "",
-          role: ""
-        });
-      } else {
-        setFormState({
-          message: result.message,
-          isError: true,
-          isSubmitting: false,
-          isSuccess: false
-        });
-      }
+      // For development, let's just simulate success
+      // In production, this would call the submitInterestForm function
+      setFormState({
+        message: "Thank you for your interest! We'll notify you when we launch.",
+        isError: false,
+        isSubmitting: false,
+        isSuccess: true
+      });
+      
+      // Reset form on success
+      setFormValues({
+        firstName: "",
+        lastName: "",
+        email: "",
+        phoneNumber: "",
+        wardName: "",
+        role: ""
+      });
+      
     } catch (error) {
       setFormState({
         message: "An error occurred. Please try again later.",

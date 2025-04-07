@@ -1,50 +1,46 @@
-import { createClient } from "@/lib/supabase/server";
-import { auth } from "@clerk/nextjs";
+import { createClient } from "@/utils/supabase/server";
 import { NextResponse } from "next/server";
 
-// POST /api/profile/confirm-phone - Verify phone with code
+// POST /api/profile/confirm-phone - Confirm a phone verification code
 export async function POST(request: Request) {
   try {
-    const { userId } = auth();
+    const supabase = await createClient();
     
-    if (!userId) {
+    // Get the authenticated user
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    
+    if (authError || !user) {
       return NextResponse.json(
         { error: "Unauthorized" },
         { status: 401 }
       );
     }
+
+    const { code } = await request.json();
     
-    const { phone_number, code } = await request.json();
-    
-    if (!phone_number || !code) {
+    if (!code) {
       return NextResponse.json(
-        { error: "Phone number and verification code are required" },
+        { error: "Verification code is required" },
         { status: 400 }
       );
     }
-    
-    const supabase = createClient();
-    
-    // Get verification record from database
-    const { data: verification, error: fetchError } = await supabase
-      .from("phone_verifications")
-      .select("*")
-      .eq("user_id", userId)
-      .eq("phone_number", phone_number)
-      .order("created_at", { ascending: false })
-      .limit(1)
+
+    // Get the current verification code and phone number for this user
+    const { data: verificationData, error: verificationError } = await supabase
+      .from("phone_verification")
+      .select("phone_number, verification_code, expires_at")
+      .eq("user_id", user.id)
       .single();
     
-    if (fetchError || !verification) {
-      console.error("Error fetching verification:", fetchError);
+    if (verificationError || !verificationData) {
       return NextResponse.json(
-        { error: "Verification not found" },
+        { error: "No verification in progress" },
         { status: 404 }
       );
     }
     
     // Check if code is expired
-    if (new Date() > new Date(verification.expires_at)) {
+    if (new Date(verificationData.expires_at) < new Date()) {
       return NextResponse.json(
         { error: "Verification code has expired" },
         { status: 400 }
@@ -52,48 +48,41 @@ export async function POST(request: Request) {
     }
     
     // Check if code matches
-    if (verification.code !== code) {
+    if (verificationData.verification_code !== code) {
       return NextResponse.json(
         { error: "Invalid verification code" },
         { status: 400 }
       );
     }
     
-    // Mark verification as verified
-    const { error: updateVerificationError } = await supabase
-      .from("phone_verifications")
-      .update({ verified: true })
-      .eq("id", verification.id);
-    
-    if (updateVerificationError) {
-      console.error("Error updating verification:", updateVerificationError);
-      return NextResponse.json(
-        { error: "Failed to verify phone" },
-        { status: 500 }
-      );
-    }
-    
-    // Update user profile with new verified phone
-    const { error: updateProfileError } = await supabase
+    // Mark phone as verified in user_profiles
+    const { error: updateError } = await supabase
       .from("user_profiles")
       .update({
-        phone_number,
+        phone_number: verificationData.phone_number,
         is_phone_verified: true,
         updated_at: new Date().toISOString()
       })
-      .eq("user_id", userId);
+      .eq("user_id", user.id);
     
-    if (updateProfileError) {
-      console.error("Error updating profile:", updateProfileError);
+    if (updateError) {
+      console.error("Error updating user profile:", updateError);
       return NextResponse.json(
         { error: "Failed to update profile" },
         { status: 500 }
       );
     }
     
+    // Delete the verification record
+    await supabase
+      .from("phone_verification")
+      .delete()
+      .eq("user_id", user.id);
+    
     return NextResponse.json({
-      message: "Phone number verified successfully",
-      phone_number
+      success: true,
+      message: "Phone number successfully verified",
+      phone_number: verificationData.phone_number
     });
   } catch (error) {
     console.error("Unexpected error:", error);

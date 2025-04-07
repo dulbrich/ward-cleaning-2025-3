@@ -1,24 +1,26 @@
-import { createClient } from "@/lib/supabase/server";
-import { auth } from "@clerk/nextjs";
+import { createClient } from "@/utils/supabase/server";
 import { NextResponse } from "next/server";
 
-// Function to generate a 6-digit code
-function generateVerificationCode(): string {
+// Generate a random verification code
+function generateVerificationCode() {
   return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
-// POST /api/profile/verify-phone - Send verification code to phone
+// POST /api/profile/verify-phone - Start phone verification process
 export async function POST(request: Request) {
   try {
-    const { userId } = auth();
+    const supabase = await createClient();
     
-    if (!userId) {
+    // Get the authenticated user
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    
+    if (authError || !user) {
       return NextResponse.json(
         { error: "Unauthorized" },
         { status: 401 }
       );
     }
-    
+
     const { phone_number } = await request.json();
     
     if (!phone_number) {
@@ -27,42 +29,39 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
-    
+
     // Generate verification code
-    const verificationCode = generateVerificationCode();
+    const code = generateVerificationCode();
+    
+    // Code expires in 15 minutes
     const expiresAt = new Date();
-    expiresAt.setMinutes(expiresAt.getMinutes() + 3); // Code expires in 3 minutes
+    expiresAt.setMinutes(expiresAt.getMinutes() + 15);
     
-    const supabase = createClient();
-    
-    // Store verification code in database
-    // In a real app, you would use a proper verification service like Twilio or similar
+    // Create verification record
     const { error } = await supabase
-      .from("phone_verifications")
+      .from("phone_verification")
       .upsert({
-        user_id: userId,
+        user_id: user.id,
         phone_number,
-        code: verificationCode,
+        verification_code: code,
         expires_at: expiresAt.toISOString(),
-        verified: false
+        created_at: new Date().toISOString()
       });
     
     if (error) {
-      console.error("Error storing verification code:", error);
+      console.error("Error creating verification:", error);
       return NextResponse.json(
-        { error: "Failed to initiate verification" },
+        { error: "Failed to start verification" },
         { status: 500 }
       );
     }
     
-    // In a real application, you would send SMS here
-    // For development, we'll just log the code
-    console.log(`Verification code for ${phone_number}: ${verificationCode}`);
+    // In a real application, this would send an SMS via a service like Twilio
+    // For the demo, we'll just return the code in the response
     
     return NextResponse.json({
-      message: "Verification code sent successfully",
-      // Include this for development only, remove in production
-      code: process.env.NODE_ENV === "development" ? verificationCode : undefined
+      message: "Verification code sent",
+      debug_code: code // Remove this in production
     });
   } catch (error) {
     console.error("Unexpected error:", error);

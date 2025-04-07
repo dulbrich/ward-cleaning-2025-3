@@ -7,35 +7,58 @@ interface UpdateScheduleRequest {
   assigned_group?: string;
 }
 
+// GET handler
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const supabase = await createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    
+    if (authError || !user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const id = params.id;
+    
+    const { data, error } = await supabase
+      .from('cleaning_schedules')
+      .select('*')
+      .eq('id', id)
+      .single();
+    
+    if (error) {
+      return NextResponse.json({ error: "Schedule not found" }, { status: 404 });
+    }
+    
+    return NextResponse.json(data);
+    
+  } catch (error) {
+    return NextResponse.json(
+      { error: "Failed to fetch schedule" },
+      { status: 500 }
+    );
+  }
+}
+
+// PUT handler
 export async function PUT(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    // 1. Get the authenticated user
     const supabase = await createClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     
     if (authError || !user) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // 2. Get schedule ID from params
-    const { id } = params;
-    if (!id) {
-      return NextResponse.json(
-        { error: "Missing schedule ID" },
-        { status: 400 }
-      );
-    }
-
-    // 3. Get request body
+    const id = params.id;
     const updateData: UpdateScheduleRequest = await request.json();
     
-    // Validate that at least one field is being updated
+    // Validate required fields
     if (!updateData.cleaning_time && !updateData.assigned_group) {
       return NextResponse.json(
         { error: "No fields to update" },
@@ -43,46 +66,23 @@ export async function PUT(
       );
     }
     
-    // 4. Verify user has access to this schedule through ward branch
-    const { data: schedule, error: fetchError } = await supabase
-      .from('cleaning_schedules')
-      .select('*, ward_branches!inner(*)')
-      .eq('id', id)
-      .single();
-    
-    if (fetchError || !schedule) {
-      return NextResponse.json(
-        { error: "Schedule not found" },
-        { status: 404 }
-      );
-    }
-    
-    // Check if the user owns the ward branch
-    if (schedule.ward_branches.user_id !== user.id) {
-      return NextResponse.json(
-        { error: "You don't have permission to update this schedule" },
-        { status: 403 }
-      );
-    }
-    
-    // 5. Update the schedule
-    const { data: updatedSchedule, error: updateError } = await supabase
+    const { data, error } = await supabase
       .from('cleaning_schedules')
       .update(updateData)
       .eq('id', id)
-      .select();
+      .select()
+      .single();
     
-    if (updateError) {
+    if (error) {
       return NextResponse.json(
-        { error: "Failed to update schedule", details: updateError.message },
+        { error: "Failed to update schedule" },
         { status: 500 }
       );
     }
     
-    return NextResponse.json(updatedSchedule[0]);
+    return NextResponse.json(data);
     
   } catch (error) {
-    console.error("Error updating schedule:", error);
     return NextResponse.json(
       { error: "Failed to update schedule" },
       { status: 500 }
@@ -90,62 +90,29 @@ export async function PUT(
   }
 }
 
+// DELETE handler
 export async function DELETE(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    // 1. Get the authenticated user
     const supabase = await createClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     
     if (authError || !user) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // 2. Get schedule ID from params
-    const { id } = params;
-    if (!id) {
-      return NextResponse.json(
-        { error: "Missing schedule ID" },
-        { status: 400 }
-      );
-    }
-
-    // 3. Verify user has access to this schedule through ward branch
-    const { data: schedule, error: fetchError } = await supabase
-      .from('cleaning_schedules')
-      .select('*, ward_branches!inner(*)')
-      .eq('id', id)
-      .single();
+    const id = params.id;
     
-    if (fetchError || !schedule) {
-      return NextResponse.json(
-        { error: "Schedule not found" },
-        { status: 404 }
-      );
-    }
-    
-    // Check if the user owns the ward branch
-    if (schedule.ward_branches.user_id !== user.id) {
-      return NextResponse.json(
-        { error: "You don't have permission to delete this schedule" },
-        { status: 403 }
-      );
-    }
-    
-    // 4. Delete the schedule
-    const { error: deleteError } = await supabase
+    const { error } = await supabase
       .from('cleaning_schedules')
       .delete()
       .eq('id', id);
     
-    if (deleteError) {
+    if (error) {
       return NextResponse.json(
-        { error: "Failed to delete schedule", details: deleteError.message },
+        { error: "Failed to delete schedule" },
         { status: 500 }
       );
     }
@@ -156,7 +123,6 @@ export async function DELETE(
     });
     
   } catch (error) {
-    console.error("Error deleting schedule:", error);
     return NextResponse.json(
       { error: "Failed to delete schedule" },
       { status: 500 }
