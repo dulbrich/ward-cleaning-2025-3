@@ -4,6 +4,9 @@ import { hasEnvVars } from "@/utils/supabase/check-env-vars";
 import Image from "next/image";
 import Link from "next/link";
 
+// Force dynamic rendering for unauthenticated layout
+export const dynamic = 'force-dynamic';
+
 export default function UnauthenticatedLayout({
     children,
   }: Readonly<{

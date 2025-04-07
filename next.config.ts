@@ -52,4 +52,12 @@ const nextConfig: NextConfig = {
   },
 };
 
+// If we're deploying to Vercel, force dynamic rendering for all pages
+if (process.env.VERCEL) {
+  console.log('Deploying to Vercel: Forcing dynamic rendering for all pages');
+  nextConfig.generateBuildId = async () => {
+    return `build-${Date.now()}`;
+  };
+}
+
 export default nextConfig;

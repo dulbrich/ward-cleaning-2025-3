@@ -3,6 +3,9 @@ import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
 import { ReactNode } from "react";
 
+// Force dynamic rendering for protected routes
+export const dynamic = 'force-dynamic';
+
 export default async function ProtectedLayout({ 
   children 
 }: { 

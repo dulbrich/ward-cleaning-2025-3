@@ -6,6 +6,9 @@ import AuthenticatedLayout from "./authenticated-layout";
 import "./globals.css";
 import UnauthenticatedLayout from "./unauthenticated-layout";
 
+// Force dynamic rendering for all pages
+export const dynamic = 'force-dynamic';
+
 const defaultUrl = process.env.VERCEL_URL
   ? `https://${process.env.VERCEL_URL}`
   : "http://localhost:3000";
