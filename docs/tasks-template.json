@@ -1,0 +1,134 @@
+{
+    "title": "Cleaning Cards 5x7 v4",
+    "sections": [
+      {
+        "name": "Tile Floors",
+        "instructions": "1. Sweep edges, corners, and behind doors. 2. Sweep or dust mop remainder of floor, working from one side of the room to the other. Do not use a dust mop in restrooms. 3. Collect debris and put in wastebasket. 4. Place a wet floor warning sign at all entrances to the area. 5. Wet mop floor using general-purpose cleaner. 6. Rinse mop and bucket.",
+        "equipment": [
+          "Broom",
+          "Dust mop (if needed)",
+          "Dustpan",
+          "Wastebasket",
+          "Mop and bucket",
+          "General-purpose cleaner",
+          "Wet floor warning signs"
+        ],
+        "safety": "Place a wet floor warning sign at all entrances to mopped areas."
+      },
+      {
+        "name": "Wood Floors",
+        "instructions": "1. Sweep edges, corners, and behind doors. 2. Sweep remainder of floor, working from one side of the room to the other. For large floors, use a dust mop, shaking out the dust mop when finished. 3. Collect debris and put in wastebasket.",
+        "equipment": [
+          "Broom",
+          "Dust mop (if needed)",
+          "Dustpan",
+          "Wastebasket"
+        ],
+        "safety": ""
+      },
+      {
+        "name": "Carpet Floors",
+        "instructions": "1. Check vacuum bags and canisters to make sure they are not full. 2. Pick up large debris before vacuuming. 3. Vacuum all dry carpeted areas with a vacuum appropriate for the area. Use a wide area vacuum for hallways and multipurpose rooms, an upright vacuum for classrooms and aisles, and a canister vacuum under chairs, inside hymnbook holders, and on the rostrum. 4. Vacuum carpet mats in foyer areas. 5. When finished, wind cords neatly.",
+        "equipment": [
+          "Wide area vacuum",
+          "Upright vacuum",
+          "Canister vacuum",
+          "Extra vacuum bags"
+        ],
+        "safety": "Inspect cords to ensure they are in good condition. Do not run over the cord. Plug and unplug cords by the plug end, never by the cord. Don’t overextend the cord or add extension cords. Report faulty equipment to the ward building representative immediately."
+      },
+      {
+        "name": "Outdoors",
+        "instructions": "During seasons without snow: 1. Pick up trash and debris on lawns, parking lots, dumpster areas, and adjacent Church-owned property. 2. Sweep walkways. 3. Pull weeds. During seasons with snow: 1. Pick up trash and debris on lawns, parking lots, dumpster areas, and adjacent Church-owned property. 2. Shovel walkways. 3. Spread ice melt on shoveled walkways. Do not use ice melt in place of shoveling.",
+        "equipment": [
+          "Gloves",
+          "Broom",
+          "Dustpan",
+          "Trash bag",
+          "Snow shovel",
+          "Ice melt"
+        ],
+        "safety": ""
+      },
+      {
+        "name": "Toilets and Urinals",
+        "instructions": "1. Flush. 2. Apply general-purpose cleaner to the inside of the toilet or urinal (do not flush). 3. Use a toilet brush to scrub the inside of the toilet or urinal. 4. Apply general-purpose cleaner to a cloth or paper towel. 5. For toilets, wipe the top, then the bottom, of the toilet seat. 6. Wipe the outside areas of the toilet or urinal. 7. Flush.",
+        "equipment": [
+          "General-purpose cleaner",
+          "Toilet brush",
+          "Cloth or paper towels",
+          "Disposable gloves"
+        ],
+        "safety": "Wear disposable gloves when cleaning toilets and urinals. Wash hands after cleaning toilets and urinals."
+      },
+      {
+        "name": "Hard Surfaces",
+        "instructions": "1. Apply general-purpose cleaner to the cleaning cloth or paper towel, not directly to the surface. 2. Wipe surface clean. Applicable surfaces include door push plates and handles, tables, piano and organ keys (only the keys), metal chairs, handrails, countertops, telephones, sinks and faucets, drinking fountains, baby changing stations, and painted walls (spot clean as necessary).",
+        "equipment": [
+          "General-purpose cleaner",
+          "Cloth or paper towels"
+        ],
+        "safety": ""
+      },
+      {
+        "name": "Wood Furniture and Trim",
+        "instructions": "1. Using a dry dusting cloth or fluffy duster, dust furniture and trim, including door frames, chair rails, baseboards, and picture frames. 2. Apply general-purpose cleaner to a cloth and clean wood on pews and chairs as well as the pulpit top.",
+        "equipment": [
+          "Dry dusting cloth or fluffy duster",
+          "Cloth",
+          "General-purpose cleaner"
+        ],
+        "safety": ""
+      },
+      {
+        "name": "Restroom Products",
+        "instructions": "Items to refill and replace include hand soap (refill or replace), toilet paper (replace empty rolls), paper towels (replace empty rolls or fully stock), and tissues (replace when empty). After refilling or replacing, check dispensers to ensure they operate correctly and ask the ward building representative for additional training if needed.",
+        "equipment": [
+          "Hand soap refill",
+          "Paper towel refills",
+          "Toilet paper rolls",
+          "Dispenser keys (if applicable)"
+        ],
+        "safety": "Clean up spills that occur during refilling and replacing."
+      },
+      {
+        "name": "Wastebaskets",
+        "instructions": "1. Dump small amounts of trash into a larger collection bag. If trash is wet or smelly: A. If the wastebasket is dirty, apply general-purpose cleaner to a cloth or paper towel and clean it. B. Leave one extra bag in the bottom of each wastebasket. C. Replace the bag, tying a knot if it is larger than the can. 2. Put trash in a garbage can or dumpster that will be emptied by a disposal company or the city.",
+        "equipment": [
+          "Bags (of various sizes)",
+          "Large collection bag",
+          "General-purpose cleaner",
+          "Cloth or paper towels"
+        ],
+        "safety": "Never reach in a wastebasket to remove trash. Objects in the trash may be hazardous."
+      },
+      {
+        "name": "Fabric Furniture",
+        "instructions": "1. Check the canister in the vacuum to ensure it is not full. 2. Remove large pieces of trash before vacuuming. 3. Vacuum fabric surfaces and crevices; fabric furniture includes sofas, chairs, pews, and rostrum seats.",
+        "equipment": [
+          "Canister vacuum"
+        ],
+        "safety": "Do not stand on furniture to reach high spots on chalkboards. If necessary, ask a taller individual for assistance."
+      },
+      {
+        "name": "Chalkboards",
+        "instructions": "1. Erase the board without applying cleaner or water. 2. Wipe the tray with a damp cloth or paper towel to prevent chalk dust from falling on the floor.",
+        "equipment": [
+          "Cloth or paper towel",
+          "Eraser",
+          "Dustpan"
+        ],
+        "safety": ""
+      },
+      {
+        "name": "Glass and Mirrors",
+        "instructions": "1. Apply glass cleaner to a cloth or paper towel. 2. Clean glass and mirror surfaces. 3. Wipe metal and plastic around windows and mirrors. 4. Clean both sides of all entry glass below eight feet (doors and windows). Additional tips: Clean from top to bottom and focus on removing smudges and fingerprints.",
+        "equipment": [
+          "Cloth or paper towels",
+          "Glass cleaner"
+        ],
+        "safety": ""
+      }
+    ]
+  }
+  

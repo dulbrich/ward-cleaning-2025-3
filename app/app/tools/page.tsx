@@ -134,7 +134,8 @@ declare global {
   }
 }
 
-export default function WardContactImportPage() {
+export default function ToolsPage() {
+  const [activeTool, setActiveTool] = useState("Ward Contact Import");
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -210,11 +211,14 @@ export default function WardContactImportPage() {
         // If we have wards, select the primary one by default
         if (wards && wards.length > 0) {
           const primaryWard = wards.find(ward => ward.is_primary);
-          setSelectedWard(primaryWard?.id || wards[0].id);
+          const defaultWardId = primaryWard?.id || wards[0].id;
+          const defaultUnitNumber = primaryWard?.unit_number || wards[0]?.unit_number;
+          
+          setSelectedWard(defaultWardId);
           
           // Update script code with the primary ward's unit number
-          if (primaryWard?.unit_number) {
-            updateScriptWithUnitNumber(primaryWard.unit_number);
+          if (defaultUnitNumber) {
+            updateScriptWithUnitNumber(defaultUnitNumber);
           }
         }
         
@@ -582,211 +586,283 @@ export default function WardContactImportPage() {
     }
   };
 
-  if (authError) {
-    return (
-      <div className="space-y-6">
-        <h1 className="text-3xl font-bold">Ward Contact Import Tool</h1>
-        
-        <div className="bg-amber-50 text-amber-800 p-6 rounded-lg border border-amber-200">
-          <h2 className="text-xl font-medium mb-2">Authentication Required</h2>
-          <p className="mb-4">You need to be logged in to use this tool.</p>
-          <button 
-            onClick={() => router.push('/auth/login')}
-            className="bg-primary text-primary-foreground hover:bg-primary/90 px-4 py-2 rounded-md text-sm font-medium"
-          >
-            Go to Login
-          </button>
-        </div>
-      </div>
-    );
-  }
+  // Define available tools
+  const tools = [
+    { name: "Ward Contact Import" },
+    { name: "Task Builder" },
+    // Add more tools here later
+  ];
 
-  // No wards warning
-  if (!loadingWards && wardBranches.length === 0) {
-    return (
-      <div className="space-y-6">
-        <h1 className="text-3xl font-bold">Ward Contact Import Tool</h1>
-        
-        <div className="bg-amber-50 text-amber-800 p-6 rounded-lg border border-amber-200">
-          <h2 className="text-xl font-medium mb-2">No Wards or Branches Found</h2>
-          <div className="flex items-start gap-3 mb-4">
-            <AlertCircle className="w-5 h-5 mt-0.5 flex-shrink-0" />
-            <p>
-              You need to set up at least one ward or branch before using this tool. 
-              Please go to Settings to add your ward or branch information.
-            </p>
+  // Conditional rendering logic moved inside the main return
+  const renderToolContent = () => {
+    if (activeTool === "Ward Contact Import") {
+      // Handle loading state for wards specifically for this tool
+      if (loadingWards) {
+        return (
+          <div className="flex items-center justify-center h-60">
+            <Loader2 className="w-12 h-12 animate-spin text-primary" />
           </div>
-          <button 
-            onClick={() => router.push('/app/settings')}
-            className="bg-primary text-primary-foreground hover:bg-primary/90 px-4 py-2 rounded-md text-sm font-medium"
-          >
-            Go to Settings
-          </button>
-        </div>
-      </div>
-    );
-  }
+        );
+      }
 
-  return (
-    <div className="space-y-6">
-      <h1 className="text-3xl font-bold">Ward Contact Import Tool</h1>
-      
-      <div className="bg-card rounded-lg border p-6 mb-6">
-        <h2 className="text-xl font-medium mb-4">Data Privacy Notice</h2>
-        <p className="mb-3 text-muted-foreground">
-          The data you import is <strong>stored locally on your device</strong> and is not shared with anyone.
-          It's used only for coordinating ward cleaning assignments within this application.
-        </p>
-        <p className="mb-3 text-muted-foreground">
-          For tracking purposes only, a secure, anonymous hash of partial contact information is stored in the database.
-          No personally identifiable information is retained in this process.
-        </p>
-        
-        {lastImportDate && (
-          <div className="mt-4 text-sm p-3 bg-muted rounded-md">
-            <strong>Last import:</strong> {lastImportDate}
-          </div>
-        )}
-      </div>
-      
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        <div className="bg-card rounded-lg border p-6 lg:col-span-7">
-          <h2 className="text-xl font-medium mb-6">Step-by-Step Instructions</h2>
-          
-          <div className="mb-6">
-            <label htmlFor="selectedWard" className="block text-sm font-medium mb-2">
-              Select a Ward/Branch
-            </label>
-            {loadingWards ? (
-              <div className="flex items-center gap-2 h-9">
-                <Loader2 className="w-4 h-4 animate-spin" />
-                <span className="text-sm text-muted-foreground">Loading wards...</span>
-              </div>
-            ) : (
-              <select
-                id="selectedWard"
-                value={selectedWard}
-                onChange={handleWardChange}
-                className="w-full px-3 py-2 border rounded-md"
-                disabled={wardBranches.length === 0}
+      // Handle Auth Error specifically for this tool
+      if (authError) {
+        return (
+          <div className="space-y-6">
+             <h1 className="text-3xl font-bold">Ward Contact Import Tool</h1>
+            <div className="bg-amber-50 text-amber-800 p-6 rounded-lg border border-amber-200">
+              <h2 className="text-xl font-medium mb-2">Authentication Required</h2>
+              <p className="mb-4">You need to be logged in to use this tool.</p>
+              <button
+                onClick={() => router.push('/auth/login')}
+                className="bg-primary text-primary-foreground hover:bg-primary/90 px-4 py-2 rounded-md text-sm font-medium"
               >
-                {wardBranches.length === 0 ? (
-                  <option value="">No wards or branches available</option>
-                ) : (
-                  wardBranches.map(ward => (
+                Go to Login
+              </button>
+            </div>
+          </div>
+        );
+      }
+
+      // Handle No Wards Found specifically for this tool
+      if (!loadingWards && wardBranches.length === 0) {
+        return (
+          <div className="space-y-6">
+             <h1 className="text-3xl font-bold">Ward Contact Import Tool</h1>
+            <div className="bg-amber-50 text-amber-800 p-6 rounded-lg border border-amber-200">
+              <h2 className="text-xl font-medium mb-2">No Wards or Branches Found</h2>
+              <div className="flex items-start gap-3 mb-4">
+                <AlertCircle className="w-5 h-5 mt-0.5 flex-shrink-0" />
+                <p>
+                  You need to set up at least one ward or branch before using this tool. 
+                  Please go to Settings to add your ward or branch information.
+                </p>
+              </div>
+              <button 
+                onClick={() => router.push('/app/settings')}
+                className="bg-primary text-primary-foreground hover:bg-primary/90 px-4 py-2 rounded-md text-sm font-medium"
+              >
+                Go to Settings
+              </button>
+            </div>
+          </div>
+        );
+      }
+
+      // Render the main tool content if authenticated and wards exist
+      return (
+        <div className="space-y-6">
+           <h1 className="text-3xl font-bold">Ward Contact Import Tool</h1>
+
+          <div className="bg-card rounded-lg border p-6 mb-6">
+            <h2 className="text-xl font-medium mb-4">Data Privacy Notice</h2>
+            <p className="mb-3 text-muted-foreground">
+              The data you import is <strong>stored locally on your device</strong> and is not shared with anyone.
+              It's used only for coordinating ward cleaning assignments within this application.
+            </p>
+            <p className="mb-3 text-muted-foreground">
+              For tracking purposes only, a secure, anonymous hash of partial contact information is stored in the database.
+              No personally identifiable information is retained in this process.
+            </p>
+
+            {lastImportDate && (
+              <div className="mt-4 text-sm p-3 bg-muted rounded-md">
+                <strong>Last import:</strong> {lastImportDate}
+              </div>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            <div className="bg-card rounded-lg border p-6 lg:col-span-7">
+              <h2 className="text-xl font-medium mb-6">Step-by-Step Instructions</h2>
+
+              <div className="mb-6">
+                <label htmlFor="selectedWard" className="block text-sm font-medium mb-2">
+                  Select a Ward/Branch
+                </label>
+                {/* Loading state handled above, directly render select */}
+                <select
+                  id="selectedWard"
+                  value={selectedWard}
+                  onChange={handleWardChange}
+                  className="w-full px-3 py-2 border rounded-md bg-background" // Added bg-background
+                  disabled={wardBranches.length === 0 || loading} // Disable during import loading too
+                >
+                  {wardBranches.map(ward => (
                     <option key={ward.id} value={ward.id}>
                       {ward.name}{ward.is_primary ? ' (Primary)' : ''}
                     </option>
-                  ))
-                )}
-              </select>
-            )}
-          </div>
-          
-          <InstructionStep 
-            number={1} 
-            title="Log in to churchofjesuschrist.org" 
-            description="Visit https://churchofjesuschrist.org and log in with your Church account."
-          />
-          
-          <InstructionStep 
-            number={2} 
-            title="Navigate to Ward Directory" 
-            description="Go to the Ward Directory and Map page."
-          />
-          
-          <InstructionStep 
-            number={3} 
-            title="Open Developer Tools" 
-            description={
-              <div>
-                Press <code className="bg-muted px-1 py-0.5 rounded">Ctrl + Shift + I</code> (or <code className="bg-muted px-1 py-0.5 rounded">Cmd + Option + I</code> on Mac) to open developer tools.
+                  ))}
+                </select>
               </div>
-            }
-          />
-          
-          <InstructionStep 
-            number={4} 
-            title="Enable Pasting" 
-            description={
-              <div>
-                Click on the Console tab, type <code className="bg-muted px-1 py-0.5 rounded">allow pasting</code> and press Enter.
-              </div>
-            }
-          />
-          
-          <InstructionStep 
-            number={5} 
-            title="Run Script" 
-            description={
-              <div>
-                <p className="mb-3">Copy and paste the following script into the console and press Enter:</p>
-                <div className="w-full overflow-hidden" style={{ maxWidth: "100%" }}>
-                  <CodeBlock code={scriptCode} />
-                </div>
-              </div>
-            }
-          />
-          
-          <InstructionStep 
-            number={6} 
-            title="Import the Downloaded File" 
-            description="Import the downloaded JSON file below to import your ward's contact information."
-          />
-        </div>
-        
-        <div className="bg-card rounded-lg border p-6 lg:col-span-5">
-          <h2 className="text-xl font-medium mb-4">Import Ward Contacts</h2>
-          
-          <div className="mb-6">
-            <label className="block text-sm font-medium mb-2">Select the downloaded JSON file</label>
-            <input
-              type="file"
-              accept=".json"
-              onChange={handleFileChange}
-              className="block w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-primary file:text-primary-foreground hover:file:bg-primary/90"
-            />
-            {error && <p className="mt-2 text-sm text-red-500">{error}</p>}
-          </div>
-          
-          {loading ? (
-            <div className="flex flex-col items-center justify-center">
-              <Loader2 className="w-8 h-8 text-primary animate-spin mb-2" />
-              {importProgress !== null && (
-                <div className="w-full mt-2">
-                  <div className="w-full bg-muted rounded-full h-2.5">
-                    <div
-                      className="bg-primary h-2.5 rounded-full transition-all duration-300"
-                      style={{ width: `${importProgress}%` }}
-                    ></div>
+
+              <InstructionStep
+                number={1}
+                title="Log in to churchofjesuschrist.org"
+                description="Visit https://churchofjesuschrist.org and log in with your Church account."
+              />
+
+              <InstructionStep
+                number={2}
+                title="Navigate to Ward Directory"
+                description="Go to the Ward Directory and Map page for the selected Ward/Branch above."
+              />
+
+              <InstructionStep
+                number={3}
+                title="Open Developer Tools"
+                description={
+                  <div>
+                    Press <code className="bg-muted px-1 py-0.5 rounded">Ctrl + Shift + I</code> (or <code className="bg-muted px-1 py-0.5 rounded">Cmd + Option + I</code> on Mac) to open developer tools.
                   </div>
-                  <p className="text-xs text-center mt-1">{importProgress}% Complete</p>
+                }
+              />
+
+              <InstructionStep
+                number={4}
+                title="Enable Pasting"
+                description={
+                  <div>
+                    Click on the Console tab, type <code className="bg-muted px-1 py-0.5 rounded">allow pasting</code> and press Enter. You might need to do this each time you open the console.
+                  </div>
+                }
+              />
+
+              <InstructionStep
+                number={5}
+                title="Run Script"
+                description={
+                  <div>
+                    <p className="mb-3">Copy and paste the following script (updated for your selected ward) into the console and press Enter:</p>
+                    <div className="w-full overflow-hidden" style={{ maxWidth: "100%" }}>
+                      <CodeBlock code={scriptCode} />
+                    </div>
+                     <p className="text-xs text-muted-foreground mt-2">This will download a file named like YYYY-MM-DD.json.</p>
+                  </div>
+                }
+              />
+
+              <InstructionStep
+                number={6}
+                title="Import the Downloaded File"
+                description="Select the downloaded JSON file below to import your ward's contact information."
+              />
+            </div>
+
+            <div className="bg-card rounded-lg border p-6 lg:col-span-5">
+              <h2 className="text-xl font-medium mb-4">Import Ward Contacts</h2>
+
+              <div className="mb-6">
+                <label htmlFor="fileInput" className="block text-sm font-medium mb-2">Select the downloaded JSON file</label>
+                <input
+                  id="fileInput"
+                  type="file"
+                  accept=".json"
+                  onChange={handleFileChange}
+                  disabled={loading} // Disable during import
+                  className="block w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-primary file:text-primary-foreground hover:file:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+                />
+                {error && <p className="mt-2 text-sm text-red-500">{error}</p>}
+              </div>
+
+              {loading ? (
+                <div className="flex flex-col items-center justify-center">
+                  <Loader2 className="w-8 h-8 text-primary animate-spin mb-2" />
+                  {importProgress !== null && (
+                    <div className="w-full mt-2">
+                      <div className="w-full bg-muted rounded-full h-2.5">
+                        <div
+                          className="bg-primary h-2.5 rounded-full transition-all duration-300"
+                          style={{ width: `${importProgress}%` }}
+                        ></div>
+                      </div>
+                      <p className="text-xs text-center mt-1">{importProgress}% Complete</p>
+                    </div>
+                  )}
+                  <p className="text-sm mt-2">Importing contacts...</p>
+                </div>
+              ) : (
+                <button
+                  onClick={handleImport}
+                  disabled={!file || !selectedWard || loadingWards || authError} // More robust disabled check
+                  className={`w-full px-4 py-2 rounded-md text-sm font-medium text-white transition-colors ${
+                    !file || !selectedWard || loadingWards || authError
+                      ? 'bg-primary/50 cursor-not-allowed'
+                      : 'bg-primary hover:bg-primary/90'
+                  }`}
+                >
+                  Import Contacts
+                </button>
+              )}
+
+              {success && message && ( // Check for message content too
+                <div className="mt-4 p-3 bg-green-100 text-green-700 rounded-md">
+                  <p>{message}</p>
+                  {(trackedUsers.new > 0) && ( // Simplified display
+                    <p className="text-xs mt-1">
+                      {trackedUsers.new} household head{trackedUsers.new !== 1 ? 's' : ''} tracked.
+                    </p>
+                  )}
                 </div>
               )}
-              <p className="text-sm mt-2">Importing contacts...</p>
             </div>
-          ) : (
-            <button
-              onClick={handleImport}
-              disabled={!file || !selectedWard}
-              className={`w-full px-4 py-2 rounded-md text-sm font-medium text-white ${
-                !file || !selectedWard ? 'bg-primary/50 cursor-not-allowed' : 'bg-primary hover:bg-primary/90'
-              }`}
-            >
-              Import Contacts
-            </button>
-          )}
-          
-          {success && (
-            <div className="mt-4 p-3 bg-green-100 text-green-700 rounded-md">
-              <p>{message}</p>
-              {(trackedUsers.new > 0 || trackedUsers.existing > 0) && (
-                <p className="text-xs mt-2">
-                  {trackedUsers.new > 0 && `${trackedUsers.new} household heads tracked.`}
-                </p>
-              )}
+          </div>
+        </div>
+      );
+    }
+
+    if (activeTool === "Task Builder") {
+      return (
+        <div className="bg-card rounded-lg border p-6">
+          <h2 className="text-xl font-medium mb-4">Task Builder</h2>
+          <p className="text-muted-foreground">This tool allows creating and managing cleaning tasks. Coming soon!</p>
+        </div>
+      );
+    }
+
+    // Default case if no tool matches (shouldn't happen with current setup)
+    return <div>Select a tool from the menu.</div>;
+  };
+
+
+  return (
+     <div className="space-y-6">
+      <h1 className="text-3xl font-bold">Tools</h1> {/* Main page title */}
+
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        {/* Tool Navigation */}
+        <div className="md:col-span-1">
+          <nav className="bg-card rounded-lg border overflow-hidden sticky top-20"> {/* Added sticky top */}
+            <div className="p-2">
+              {tools.map((tool) => (
+                <button
+                  key={tool.name}
+                  className={`w-full text-left px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                    activeTool === tool.name
+                      ? 'bg-primary/10 text-primary'
+                      : 'text-foreground hover:bg-muted' // Ensure text color contrast
+                  }`}
+                  onClick={() => {
+                     setActiveTool(tool.name);
+                     // Reset tool-specific states if necessary when switching
+                     setError(null);
+                     setSuccess(false);
+                     setMessage('');
+                     setFile(null);
+                     setImportProgress(null);
+                     // Don't reset ward selection or list
+                  }}
+                >
+                  {tool.name}
+                </button>
+              ))}
             </div>
-          )}
+          </nav>
+        </div>
+
+        {/* Tool Content Area */}
+        <div className="md:col-span-3 space-y-6">
+          {renderToolContent()}
         </div>
       </div>
     </div>
