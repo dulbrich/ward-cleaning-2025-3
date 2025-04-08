@@ -1,11 +1,18 @@
 "use client";
 
+import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { createClient } from "@/utils/supabase/client";
-import { AlertCircle, Loader2 } from "lucide-react";
+import { AlertCircle, AlertTriangle, Check, ChevronRight, ClipboardList, Edit, FileText, Loader2, MoreHorizontal, Plus, RefreshCw, Search, Trash2, Upload, X } from "lucide-react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-import { getLastWardDataImport, logWardDataImport, trackAnonymousUser } from "./actions";
+import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { createWardTask, deleteWardTask, getLastWardDataImport, getTaskTemplates, getWardTasks, logWardDataImport, trackAnonymousUser, updateWardTask, uploadTaskImage } from "./actions";
 
 // Dynamically import SyntaxHighlighter to prevent SSR issues
 const DynamicSyntaxHighlighter = dynamic(
@@ -132,6 +139,992 @@ declare global {
   interface Window {
     debugAnonymousTracking: () => Promise<void>;
   }
+}
+
+// Task interfaces
+interface TaskTemplate {
+  id: string;
+  title: string;
+  instructions: string;
+  equipment: string;
+  safety: string;
+  category: string;
+  created_at: string;
+  updated_at: string;
+}
+
+interface WardTask {
+  id: string;
+  ward_id: string;
+  template_id?: string;
+  title: string;
+  subtitle?: string;
+  instructions: string;
+  equipment: string;
+  safety?: string;
+  image_url?: string;
+  color?: string;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+  created_by: string;
+}
+
+// Add a component for HTML content rendering
+function HtmlContent({ html }: { html: string }) {
+  return (
+    <div className="prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: html }} />
+  );
+}
+
+// Task color options
+const TASK_COLORS = [
+  { name: "Default", value: "" },
+  { name: "Red", value: "#ef4444" },
+  { name: "Orange", value: "#f97316" },
+  { name: "Yellow", value: "#eab308" },
+  { name: "Green", value: "#22c55e" },
+  { name: "Blue", value: "#3b82f6" },
+  { name: "Purple", value: "#a855f7" },
+  { name: "Pink", value: "#ec4899" },
+];
+
+// Task Categories
+const TASK_CATEGORIES = [
+  "All",
+  "Floors",
+  "Furniture",
+  "Restrooms",
+  "General",
+  "Exterior",
+  "Classroom"
+];
+
+// Task List component
+function TaskList({ 
+  tasks, 
+  onEdit, 
+  onDelete, 
+  isLoading 
+}: { 
+  tasks: WardTask[];
+  onEdit: (task: WardTask) => void;
+  onDelete: (taskId: string) => void;
+  isLoading: boolean;
+}) {
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-60">
+        <Loader2 className="w-12 h-12 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (tasks.length === 0) {
+    return (
+      <div className="bg-muted/50 rounded-lg flex flex-col items-center justify-center p-12 text-center">
+        <ClipboardList className="h-12 w-12 text-muted-foreground mb-4" />
+        <h3 className="text-lg font-medium">No tasks yet</h3>
+        <p className="text-muted-foreground mt-2 mb-4">Get started by adding your first cleaning task</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {tasks.map(task => (
+        <div key={task.id} className="bg-card border rounded-lg overflow-hidden flex flex-col">
+          {/* Task header with color */}
+          <div 
+            className="p-4 border-b flex justify-between items-start"
+            style={task.color ? { borderLeft: `4px solid ${task.color}` } : {}}
+          >
+            <div>
+              <h3 className="font-medium">{task.title}</h3>
+              {task.subtitle && <p className="text-sm text-muted-foreground">{task.subtitle}</p>}
+            </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="p-2 hover:bg-muted rounded">
+                  <MoreHorizontal className="h-4 w-4" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                <DropdownMenuItem onClick={() => onEdit(task)}>
+                  <Edit className="h-4 w-4 mr-2" /> Edit Task
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  onClick={() => onDelete(task.id)}
+                  className="text-destructive focus:text-destructive"
+                >
+                  <Trash2 className="h-4 w-4 mr-2" /> Delete Task
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+
+          {/* Task image */}
+          {task.image_url && (
+            <div className="aspect-video bg-muted">
+              <img 
+                src={task.image_url} 
+                alt={task.title} 
+                className="w-full h-full object-cover"
+              />
+            </div>
+          )}
+
+          {/* Task preview content */}
+          <div className="p-4 flex-1 overflow-hidden">
+            <div className="line-clamp-3 text-sm">
+              <HtmlContent html={task.instructions} />
+            </div>
+          </div>
+
+          {/* Task footer */}
+          <div className="p-4 border-t">
+            <div className="flex items-center justify-between">
+              <Badge variant="outline">
+                {task.active ? 'Active' : 'Inactive'}
+              </Badge>
+              <span className="text-xs text-muted-foreground">
+                {new Date(task.created_at).toLocaleDateString()}
+              </span>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// Template Selection Dialog
+function TemplateSelectionDialog({ 
+  isOpen, 
+  onClose, 
+  onSelectTemplate 
+}: { 
+  isOpen: boolean; 
+  onClose: () => void; 
+  onSelectTemplate: (template: TaskTemplate) => void; 
+}) {
+  const [templates, setTemplates] = useState<TaskTemplate[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('All');
+
+  // Fetch templates when dialog opens
+  useEffect(() => {
+    if (isOpen) {
+      fetchTemplates();
+    }
+  }, [isOpen]);
+
+  // Fetch templates from server
+  const fetchTemplates = async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const category = selectedCategory !== 'All' ? selectedCategory : undefined;
+      const result = await getTaskTemplates(category);
+      
+      if (result.success) {
+        setTemplates(result.data || []);
+      } else {
+        setError(result.error || 'Failed to load templates');
+      }
+    } catch (e) {
+      setError('An unexpected error occurred');
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle category change
+  const handleCategoryChange = (category: string) => {
+    setSelectedCategory(category);
+    // Reset search when changing category
+    setSearchTerm('');
+  };
+
+  // Filter templates based on search term
+  const filteredTemplates = useMemo(() => {
+    if (!searchTerm.trim()) return templates;
+    
+    const term = searchTerm.toLowerCase();
+    return templates.filter(template => 
+      template.title.toLowerCase().includes(term) ||
+      template.instructions.toLowerCase().includes(term) ||
+      template.equipment.toLowerCase().includes(term) ||
+      (template.safety && template.safety.toLowerCase().includes(term))
+    );
+  }, [templates, searchTerm]);
+
+  // Effect to re-fetch when category changes
+  useEffect(() => {
+    if (isOpen) {
+      fetchTemplates();
+    }
+  }, [selectedCategory, isOpen]);
+
+  return (
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="sm:max-w-3xl max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="text-xl">Select a Task Template</DialogTitle>
+        </DialogHeader>
+
+        {/* Search and filters */}
+        <div className="flex flex-col sm:flex-row gap-4 mb-4">
+          <div className="relative flex-1">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              type="text"
+              placeholder="Search templates..."
+              className="pl-8"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+          <Select
+            value={selectedCategory}
+            onValueChange={handleCategoryChange}
+          >
+            <SelectTrigger className="w-full sm:w-[180px]">
+              <SelectValue placeholder="Category" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                <SelectLabel>Categories</SelectLabel>
+                {TASK_CATEGORIES.map(category => (
+                  <SelectItem key={category} value={category}>
+                    {category}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Loading state */}
+        {loading && (
+          <div className="flex justify-center items-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          </div>
+        )}
+
+        {/* Error state */}
+        {error && (
+          <div className="bg-destructive/10 text-destructive p-4 rounded-lg flex items-start gap-3">
+            <AlertTriangle className="h-5 w-5 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="font-medium">Error loading templates</p>
+              <p className="text-sm">{error}</p>
+            </div>
+          </div>
+        )}
+
+        {/* Templates grid */}
+        {!loading && !error && (
+          <>
+            {filteredTemplates.length === 0 ? (
+              <div className="text-center py-12 text-muted-foreground">
+                <FileText className="mx-auto h-12 w-12 mb-4" />
+                <p>No templates found</p>
+                {searchTerm && (
+                  <button 
+                    className="mt-4 text-primary hover:underline"
+                    onClick={() => setSearchTerm('')}
+                  >
+                    Clear search
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {filteredTemplates.map(template => (
+                  <div 
+                    key={template.id}
+                    className="border rounded-lg p-4 hover:border-primary cursor-pointer transition-colors"
+                    onClick={() => onSelectTemplate(template)}
+                  >
+                    <div className="flex justify-between items-start mb-2">
+                      <h3 className="font-medium">{template.title}</h3>
+                      <Badge variant="outline">{template.category}</Badge>
+                    </div>
+                    <div className="line-clamp-2 text-sm text-muted-foreground mb-3">
+                      <HtmlContent html={template.instructions} />
+                    </div>
+                    <button
+                      className="flex items-center text-sm text-primary hover:underline"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onSelectTemplate(template);
+                      }}
+                    >
+                      Use Template <ChevronRight className="h-4 w-4 ml-1" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+
+        <DialogFooter>
+          <button 
+            className="px-4 py-2 rounded-md text-sm font-medium bg-muted hover:bg-muted/80"
+            onClick={onClose}
+          >
+            Cancel
+          </button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// Task Editor Dialog Component
+function TaskEditorDialog({
+  isOpen,
+  onClose,
+  initialTask,
+  wardId,
+  onSave,
+  userId
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  initialTask?: Partial<WardTask>;
+  wardId: string;
+  onSave: () => void;
+  userId: string;
+}) {
+  const [task, setTask] = useState<Partial<WardTask>>({
+    title: '',
+    subtitle: '',
+    instructions: '',
+    equipment: '',
+    safety: '',
+    color: '',
+    active: true,
+    ward_id: wardId,
+    created_by: userId
+  });
+
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [isImageUploading, setIsImageUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Reset form when the dialog opens with new initialTask
+  useEffect(() => {
+    if (isOpen && initialTask) {
+      setTask({ 
+        ...initialTask,
+        ward_id: wardId,
+        created_by: userId 
+      });
+    } else if (isOpen) {
+      setTask({
+        title: '',
+        subtitle: '',
+        instructions: '',
+        equipment: '',
+        safety: '',
+        color: '',
+        active: true,
+        ward_id: wardId,
+        created_by: userId
+      });
+    }
+    setError(null);
+  }, [isOpen, initialTask, wardId, userId]);
+
+  // Handle form field changes
+  const handleChange = (
+    e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
+  ) => {
+    const { name, value } = e.target;
+    setTask(prev => ({ ...prev, [name]: value }));
+  };
+
+  // Handle checkbox changes
+  const handleCheckboxChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const { name, checked } = e.target;
+    setTask(prev => ({ ...prev, [name]: checked }));
+  };
+
+  // Handle color selection
+  const handleColorChange = (color: string) => {
+    setTask(prev => ({ ...prev, color }));
+  };
+
+  // Handle form submission
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      if (!task.title || !task.instructions || !task.equipment) {
+        throw new Error('Please fill out all required fields');
+      }
+
+      if (task.id) {
+        // Update existing task
+        const { id, created_at, updated_at, created_by, ...updates } = task as WardTask;
+        const result = await updateWardTask(id, updates);
+        if (!result.success) {
+          throw new Error(result.error || 'Failed to update task');
+        }
+      } else {
+        // Create new task
+        const result = await createWardTask(task as Omit<WardTask, 'id' | 'created_at' | 'updated_at'>);
+        if (!result.success) {
+          throw new Error(result.error || 'Failed to create task');
+        }
+      }
+
+      onSave();
+      onClose();
+    } catch (err) {
+      console.error('Error saving task:', err);
+      setError(err instanceof Error ? err.message : 'An unexpected error occurred');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Handle image upload
+  const handleImageUpload = async (e: ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0) return;
+    
+    const file = e.target.files[0];
+    setIsImageUploading(true);
+    
+    try {
+      const result = await uploadTaskImage(wardId, file);
+      if (result.success && result.data) {
+        setTask(prev => ({ ...prev, image_url: result.data.url }));
+      } else {
+        throw new Error(result.error || 'Failed to upload image');
+      }
+    } catch (err) {
+      console.error('Error uploading image:', err);
+      setError(err instanceof Error ? err.message : 'An unexpected error occurred with image upload');
+    } finally {
+      setIsImageUploading(false);
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  // Handle image removal
+  const handleRemoveImage = () => {
+    setTask(prev => ({ ...prev, image_url: undefined }));
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="text-xl">
+            {task.id ? 'Edit Task' : 'Create New Task'}
+          </DialogTitle>
+        </DialogHeader>
+
+        <form onSubmit={handleSubmit} className="space-y-6 py-4">
+          {/* Error display */}
+          {error && (
+            <div className="bg-destructive/10 text-destructive p-4 rounded-lg flex items-start gap-3">
+              <AlertTriangle className="h-5 w-5 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="font-medium">Error saving task</p>
+                <p className="text-sm">{error}</p>
+              </div>
+            </div>
+          )}
+          
+          {/* Title & Subtitle */}
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="title" className="flex items-center">
+                Title <span className="text-destructive ml-1">*</span>
+              </Label>
+              <Input
+                id="title"
+                name="title"
+                value={task.title || ''}
+                onChange={handleChange}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="subtitle">Subtitle (Optional)</Label>
+              <Input
+                id="subtitle"
+                name="subtitle"
+                value={task.subtitle || ''}
+                onChange={handleChange}
+              />
+            </div>
+          </div>
+          
+          {/* Main fields: Instructions, Equipment, Safety */}
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="instructions" className="flex items-center">
+                Instructions <span className="text-destructive ml-1">*</span>
+              </Label>
+              <Textarea
+                id="instructions"
+                name="instructions"
+                value={task.instructions || ''}
+                onChange={handleChange}
+                rows={6}
+                required
+              />
+              <p className="text-xs text-muted-foreground">
+                HTML formatting is supported (e.g., &lt;ol&gt;, &lt;ul&gt;, &lt;li&gt;, &lt;p&gt;, &lt;strong&gt;)
+              </p>
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="equipment" className="flex items-center">
+                Equipment <span className="text-destructive ml-1">*</span>
+              </Label>
+              <Textarea
+                id="equipment"
+                name="equipment"
+                value={task.equipment || ''}
+                onChange={handleChange}
+                rows={4}
+                required
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="safety">Safety Guidelines (Optional)</Label>
+              <Textarea
+                id="safety"
+                name="safety"
+                value={task.safety || ''}
+                onChange={handleChange}
+                rows={3}
+              />
+            </div>
+          </div>
+          
+          {/* Image Upload */}
+          <div className="space-y-2">
+            <Label>Task Image (Optional)</Label>
+            
+            {task.image_url ? (
+              <div className="relative rounded-lg overflow-hidden border">
+                <img 
+                  src={task.image_url} 
+                  alt="Task" 
+                  className="w-full h-48 object-cover"
+                />
+                <button
+                  type="button"
+                  className="absolute top-2 right-2 p-1 bg-background/80 rounded-full hover:bg-background"
+                  onClick={handleRemoveImage}
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+            ) : (
+              <div className="border border-dashed rounded-lg p-6 text-center">
+                <input
+                  type="file"
+                  id="image"
+                  ref={fileInputRef}
+                  accept="image/*"
+                  onChange={handleImageUpload}
+                  className="hidden"
+                />
+                
+                {isImageUploading ? (
+                  <div className="flex flex-col items-center">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary mb-2" />
+                    <p className="text-sm">Uploading image...</p>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="flex flex-col items-center w-full"
+                  >
+                    <Upload className="h-8 w-8 text-primary mb-2" />
+                    <p>Click to upload an image</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      JPG, PNG or WebP. 2MB max.
+                    </p>
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+          
+          {/* Color Selection */}
+          <div className="space-y-2">
+            <Label>Task Color (Optional)</Label>
+            <div className="flex flex-wrap gap-3">
+              {TASK_COLORS.map(color => (
+                <button
+                  key={color.value}
+                  type="button"
+                  className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                    task.color === color.value ? 'ring-2 ring-primary ring-offset-2' : ''
+                  }`}
+                  style={{ 
+                    backgroundColor: color.value || '#e2e8f0',
+                  }}
+                  title={color.name}
+                  onClick={() => handleColorChange(color.value)}
+                >
+                  {task.color === color.value && <Check className="h-4 w-4 text-white" />}
+                </button>
+              ))}
+            </div>
+          </div>
+          
+          {/* Status */}
+          <div className="flex items-center space-x-2">
+            <input
+              type="checkbox"
+              id="active"
+              name="active"
+              checked={task.active !== false}
+              onChange={handleCheckboxChange}
+              className="rounded border-gray-300 text-primary focus:ring-primary"
+            />
+            <Label htmlFor="active">Active</Label>
+          </div>
+          
+          <DialogFooter>
+            <button
+              type="button"
+              className="px-4 py-2 rounded-md text-sm font-medium bg-muted hover:bg-muted/80"
+              onClick={onClose}
+              disabled={isLoading}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className={`px-4 py-2 rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 ${
+                isLoading ? 'opacity-70 cursor-not-allowed' : ''
+              }`}
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2 inline-block" />
+                  {task.id ? 'Updating...' : 'Creating...'}
+                </>
+              ) : (
+                task.id ? 'Update Task' : 'Create Task'
+              )}
+            </button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// Task Builder Component
+function TaskBuilderTool({ wardBranches, selectedWard, authError }: {
+  wardBranches: WardBranch[];
+  selectedWard: string;
+  authError: boolean;
+}) {
+  const [tasks, setTasks] = useState<WardTask[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [isTemplateDialogOpen, setIsTemplateDialogOpen] = useState(false);
+  const [isTaskEditorOpen, setIsTaskEditorOpen] = useState(false);
+  const [editingTask, setEditingTask] = useState<WardTask | undefined>(undefined);
+  const [isConfirmDeleteOpen, setIsConfirmDeleteOpen] = useState(false);
+  const [deleteTaskId, setDeleteTaskId] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const router = useRouter();
+  const supabase = createClient();
+
+  // Fetch tasks when ward is selected
+  useEffect(() => {
+    if (selectedWard) {
+      fetchTasks();
+    }
+  }, [selectedWard]);
+
+  // Get current user ID
+  const [userId, setUserId] = useState<string | null>(null);
+  useEffect(() => {
+    const getUserId = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        setUserId(user.id);
+      }
+    };
+    getUserId();
+  }, [supabase]);
+
+  // Fetch tasks from the server
+  const fetchTasks = async () => {
+    if (!selectedWard) return;
+    
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const result = await getWardTasks(selectedWard);
+      
+      if (result.success) {
+        setTasks(result.data || []);
+      } else {
+        setError(result.error || 'Failed to load tasks');
+      }
+    } catch (e) {
+      setError('An unexpected error occurred');
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle adding a new task from template
+  const handleAddTask = () => {
+    setIsTemplateDialogOpen(true);
+  };
+
+  // Handle template selection
+  const handleSelectTemplate = (template: TaskTemplate) => {
+    setIsTemplateDialogOpen(false);
+    setEditingTask({
+      id: '',
+      ward_id: selectedWard,
+      template_id: template.id,
+      title: template.title,
+      subtitle: '',
+      instructions: template.instructions,
+      equipment: template.equipment,
+      safety: template.safety || '',
+      image_url: '',
+      color: '',
+      active: true,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      created_by: userId || ''
+    });
+    setIsTaskEditorOpen(true);
+  };
+
+  // Handle edit task
+  const handleEditTask = (task: WardTask) => {
+    setEditingTask(task);
+    setIsTaskEditorOpen(true);
+  };
+
+  // Handle task save (refresh the list)
+  const handleTaskSave = () => {
+    fetchTasks();
+  };
+
+  // Handle delete click
+  const handleDeleteClick = (taskId: string) => {
+    setDeleteTaskId(taskId);
+    setIsConfirmDeleteOpen(true);
+  };
+
+  // Handle delete confirmation
+  const handleConfirmDelete = async () => {
+    if (!deleteTaskId) return;
+    
+    setIsDeleting(true);
+    
+    try {
+      const result = await deleteWardTask(deleteTaskId);
+      
+      if (result.success) {
+        setTasks(prevTasks => prevTasks.filter(task => task.id !== deleteTaskId));
+        setIsConfirmDeleteOpen(false);
+        setDeleteTaskId(null);
+      } else {
+        setError(result.error || 'Failed to delete task');
+      }
+    } catch (e) {
+      setError('An unexpected error occurred while deleting the task');
+      console.error(e);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  // Handle authentication error
+  if (authError) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-3xl font-bold">Task Builder</h1>
+        <div className="bg-amber-50 text-amber-800 p-6 rounded-lg border border-amber-200">
+          <h2 className="text-xl font-medium mb-2">Authentication Required</h2>
+          <p className="mb-4">You need to be logged in to use this tool.</p>
+          <button
+            onClick={() => router.push('/auth/login')}
+            className="bg-primary text-primary-foreground hover:bg-primary/90 px-4 py-2 rounded-md text-sm font-medium"
+          >
+            Go to Login
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Handle no wards found
+  if (!loading && wardBranches.length === 0) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-3xl font-bold">Task Builder</h1>
+        <div className="bg-amber-50 text-amber-800 p-6 rounded-lg border border-amber-200">
+          <h2 className="text-xl font-medium mb-2">No Wards or Branches Found</h2>
+          <div className="flex items-start gap-3 mb-4">
+            <AlertCircle className="w-5 h-5 mt-0.5 flex-shrink-0" />
+            <p>
+              You need to set up at least one ward or branch before using this tool.
+              Please go to Settings to add your ward or branch information.
+            </p>
+          </div>
+          <button
+            onClick={() => router.push('/app/settings')}
+            className="bg-primary text-primary-foreground hover:bg-primary/90 px-4 py-2 rounded-md text-sm font-medium"
+          >
+            Go to Settings
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <h1 className="text-3xl font-bold">Task Builder</h1>
+
+      <div className="flex justify-between items-center">
+        <div className="space-y-1">
+          <h2 className="text-xl font-medium">Cleaning Tasks</h2>
+          <p className="text-muted-foreground">
+            Create and manage cleaning tasks for your ward
+          </p>
+        </div>
+        
+        <div className="flex gap-2">
+          <button
+            onClick={fetchTasks}
+            className="px-3 py-2 rounded-md text-sm font-medium bg-muted hover:bg-muted/80 flex items-center"
+            disabled={loading}
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </button>
+          
+          <button
+            onClick={handleAddTask}
+            className="px-3 py-2 rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 flex items-center"
+            disabled={!selectedWard}
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Add Task
+          </button>
+        </div>
+      </div>
+
+      {/* Error display */}
+      {error && (
+        <div className="bg-destructive/10 text-destructive p-4 rounded-lg flex items-start gap-3">
+          <AlertTriangle className="h-5 w-5 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="font-medium">Error</p>
+            <p className="text-sm">{error}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Tasks list */}
+      <TaskList
+        tasks={tasks}
+        onEdit={handleEditTask}
+        onDelete={handleDeleteClick}
+        isLoading={loading}
+      />
+
+      {/* Template selection dialog */}
+      <TemplateSelectionDialog
+        isOpen={isTemplateDialogOpen}
+        onClose={() => setIsTemplateDialogOpen(false)}
+        onSelectTemplate={handleSelectTemplate}
+      />
+
+      {/* Task editor dialog */}
+      {userId && (
+        <TaskEditorDialog
+          isOpen={isTaskEditorOpen}
+          onClose={() => {
+            setIsTaskEditorOpen(false);
+            setEditingTask(undefined);
+          }}
+          initialTask={editingTask}
+          wardId={selectedWard}
+          onSave={handleTaskSave}
+          userId={userId}
+        />
+      )}
+
+      {/* Delete confirmation dialog */}
+      <Dialog open={isConfirmDeleteOpen} onOpenChange={setIsConfirmDeleteOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-xl">Delete Task</DialogTitle>
+          </DialogHeader>
+          <div className="py-6">
+            <p className="mb-2">Are you sure you want to delete this task?</p>
+            <p className="text-muted-foreground text-sm">This action cannot be undone.</p>
+          </div>
+          <DialogFooter>
+            <button
+              className="px-4 py-2 rounded-md text-sm font-medium bg-muted hover:bg-muted/80"
+              onClick={() => setIsConfirmDeleteOpen(false)}
+              disabled={isDeleting}
+            >
+              Cancel
+            </button>
+            <button
+              className="px-4 py-2 rounded-md text-sm font-medium bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={handleConfirmDelete}
+              disabled={isDeleting}
+            >
+              {isDeleting ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2 inline-block" />
+                  Deleting...
+                </>
+              ) : (
+                'Delete Task'
+              )}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
 }
 
 export default function ToolsPage() {
@@ -813,10 +1806,11 @@ export default function ToolsPage() {
 
     if (activeTool === "Task Builder") {
       return (
-        <div className="bg-card rounded-lg border p-6">
-          <h2 className="text-xl font-medium mb-4">Task Builder</h2>
-          <p className="text-muted-foreground">This tool allows creating and managing cleaning tasks. Coming soon!</p>
-        </div>
+        <TaskBuilderTool 
+          wardBranches={wardBranches}
+          selectedWard={selectedWard}
+          authError={authError}
+        />
       );
     }
 

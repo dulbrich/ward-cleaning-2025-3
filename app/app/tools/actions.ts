@@ -25,6 +25,35 @@ interface UpdateData {
   registered_user_id?: string;
 }
 
+// Task Builder Interfaces
+interface TaskTemplate {
+  id: string;
+  title: string;
+  instructions: string;
+  equipment: string;
+  safety: string;
+  category: string;
+  created_at: string;
+  updated_at: string;
+}
+
+interface WardTask {
+  id: string;
+  ward_id: string;
+  template_id?: string;
+  title: string;
+  subtitle?: string;
+  instructions: string;
+  equipment: string;
+  safety?: string;
+  image_url?: string;
+  color?: string;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+  created_by: string;
+}
+
 /**
  * Creates an anonymous identifier for a user that can be used for tracking
  * without storing personally identifiable information.
@@ -481,6 +510,396 @@ export async function getLastWardDataImport() {
     return { 
       success: false, 
       error: error instanceof Error ? error.message : "Unknown error getting import data"
+    };
+  }
+}
+
+// Task Builder Actions
+
+/**
+ * Get all task templates
+ * Optionally filter by category
+ */
+export async function getTaskTemplates(category?: string) {
+  try {
+    const supabase = await createClient();
+    
+    // Check if user is authenticated
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return { success: false, error: "Not authenticated" };
+    }
+    
+    // Build query
+    let query = supabase
+      .from('task_templates')
+      .select('*')
+      .order('title');
+      
+    // Add category filter if provided
+    if (category) {
+      query = query.eq('category', category);
+    }
+    
+    // Execute query
+    const { data, error } = await query;
+    
+    if (error) {
+      return { 
+        success: false, 
+        error: `Error fetching task templates: ${error.message}`
+      };
+    }
+    
+    return {
+      success: true,
+      data: data as TaskTemplate[]
+    };
+  } catch (error) {
+    console.error("Error fetching task templates:", error);
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : "Error fetching task templates"
+    };
+  }
+}
+
+/**
+ * Get a single task template by ID
+ */
+export async function getTaskTemplate(templateId: string) {
+  try {
+    const supabase = await createClient();
+    
+    // Check if user is authenticated
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return { success: false, error: "Not authenticated" };
+    }
+    
+    const { data, error } = await supabase
+      .from('task_templates')
+      .select('*')
+      .eq('id', templateId)
+      .single();
+    
+    if (error) {
+      return { 
+        success: false, 
+        error: `Error fetching task template: ${error.message}`
+      };
+    }
+    
+    return {
+      success: true,
+      data: data as TaskTemplate
+    };
+  } catch (error) {
+    console.error("Error fetching task template:", error);
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : "Error fetching task template"
+    };
+  }
+}
+
+/**
+ * Get tasks for a specific ward
+ */
+export async function getWardTasks(wardId: string) {
+  try {
+    const supabase = await createClient();
+    
+    // Check if user is authenticated
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return { success: false, error: "Not authenticated" };
+    }
+    
+    const { data, error } = await supabase
+      .from('ward_tasks')
+      .select('*')
+      .eq('ward_id', wardId)
+      .order('created_at', { ascending: false });
+    
+    if (error) {
+      return { 
+        success: false, 
+        error: `Error fetching ward tasks: ${error.message}`
+      };
+    }
+    
+    return {
+      success: true,
+      data: data as WardTask[]
+    };
+  } catch (error) {
+    console.error("Error fetching ward tasks:", error);
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : "Error fetching ward tasks"
+    };
+  }
+}
+
+/**
+ * Create a new task for a ward
+ */
+export async function createWardTask(task: Omit<WardTask, 'id' | 'created_at' | 'updated_at'>) {
+  try {
+    const supabase = await createClient();
+    
+    // Check if user is authenticated
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return { success: false, error: "Not authenticated" };
+    }
+
+    // Check if user owns the ward
+    const { data: wardData, error: wardError } = await supabase
+      .from('ward_branches')
+      .select('user_id')
+      .eq('id', task.ward_id)
+      .single();
+      
+    if (wardError || !wardData) {
+      return { 
+        success: false, 
+        error: "Ward not found or access denied"
+      };
+    }
+    
+    if (wardData.user_id !== user.id) {
+      return { 
+        success: false, 
+        error: "You don't have permission to add tasks to this ward"
+      };
+    }
+    
+    // Create task
+    const { data, error } = await supabase
+      .from('ward_tasks')
+      .insert([task])
+      .select()
+      .single();
+    
+    if (error) {
+      return { 
+        success: false, 
+        error: `Error creating task: ${error.message}`
+      };
+    }
+    
+    return {
+      success: true,
+      data: data as WardTask
+    };
+  } catch (error) {
+    console.error("Error creating ward task:", error);
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : "Error creating ward task"
+    };
+  }
+}
+
+/**
+ * Update an existing ward task
+ */
+export async function updateWardTask(taskId: string, taskUpdates: Partial<Omit<WardTask, 'id' | 'created_at' | 'updated_at' | 'created_by'>>) {
+  try {
+    const supabase = await createClient();
+    
+    // Check if user is authenticated
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return { success: false, error: "Not authenticated" };
+    }
+    
+    // First get the task to check permissions
+    const { data: existingTask, error: getError } = await supabase
+      .from('ward_tasks')
+      .select('*, ward_branches!inner(user_id)')
+      .eq('id', taskId)
+      .single();
+    
+    if (getError || !existingTask) {
+      return { 
+        success: false, 
+        error: "Task not found or access denied"
+      };
+    }
+    
+    // Check if user owns the ward
+    const ward = existingTask.ward_branches as any;
+    if (ward.user_id !== user.id) {
+      return { 
+        success: false, 
+        error: "You don't have permission to update this task"
+      };
+    }
+    
+    // Update task
+    const { data, error } = await supabase
+      .from('ward_tasks')
+      .update(taskUpdates)
+      .eq('id', taskId)
+      .select()
+      .single();
+    
+    if (error) {
+      return { 
+        success: false, 
+        error: `Error updating task: ${error.message}`
+      };
+    }
+    
+    return {
+      success: true,
+      data: data as WardTask
+    };
+  } catch (error) {
+    console.error("Error updating ward task:", error);
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : "Error updating ward task"
+    };
+  }
+}
+
+/**
+ * Delete a ward task
+ */
+export async function deleteWardTask(taskId: string) {
+  try {
+    const supabase = await createClient();
+    
+    // Check if user is authenticated
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return { success: false, error: "Not authenticated" };
+    }
+    
+    // First get the task to check permissions
+    const { data: existingTask, error: getError } = await supabase
+      .from('ward_tasks')
+      .select('*, ward_branches!inner(user_id)')
+      .eq('id', taskId)
+      .single();
+    
+    if (getError || !existingTask) {
+      return { 
+        success: false, 
+        error: "Task not found or access denied"
+      };
+    }
+    
+    // Check if user owns the ward
+    const ward = existingTask.ward_branches as any;
+    if (ward.user_id !== user.id) {
+      return { 
+        success: false, 
+        error: "You don't have permission to delete this task"
+      };
+    }
+    
+    // Delete task
+    const { error } = await supabase
+      .from('ward_tasks')
+      .delete()
+      .eq('id', taskId);
+    
+    if (error) {
+      return { 
+        success: false, 
+        error: `Error deleting task: ${error.message}`
+      };
+    }
+    
+    return {
+      success: true
+    };
+  } catch (error) {
+    console.error("Error deleting ward task:", error);
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : "Error deleting ward task"
+    };
+  }
+}
+
+/**
+ * Upload a task image to Supabase storage
+ */
+export async function uploadTaskImage(wardId: string, file: File) {
+  try {
+    const supabase = await createClient();
+    
+    // Check if user is authenticated
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return { success: false, error: "Not authenticated" };
+    }
+    
+    // Check if user owns the ward
+    const { data: wardData, error: wardError } = await supabase
+      .from('ward_branches')
+      .select('user_id')
+      .eq('id', wardId)
+      .single();
+      
+    if (wardError || !wardData) {
+      return { 
+        success: false, 
+        error: "Ward not found or access denied"
+      };
+    }
+    
+    if (wardData.user_id !== user.id) {
+      return { 
+        success: false, 
+        error: "You don't have permission to upload images to this ward"
+      };
+    }
+    
+    // Generate a unique filename
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${wardId}/${Date.now()}.${fileExt}`;
+    
+    // Upload file
+    const { data, error } = await supabase
+      .storage
+      .from('task-images')
+      .upload(fileName, file, {
+        contentType: file.type,
+        upsert: false
+      });
+    
+    if (error) {
+      return { 
+        success: false, 
+        error: `Error uploading image: ${error.message}`
+      };
+    }
+    
+    // Get public URL
+    const { data: { publicUrl } } = supabase
+      .storage
+      .from('task-images')
+      .getPublicUrl(data.path);
+    
+    return {
+      success: true,
+      data: {
+        path: data.path,
+        url: publicUrl
+      }
+    };
+  } catch (error) {
+    console.error("Error uploading task image:", error);
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : "Error uploading task image"
     };
   }
 } 
