@@ -68,4 +68,4 @@ const pwaConfig = {
   skipWaiting: true,
 };
 
-export default withPWA(pwaConfig)(nextConfig);
+export default withPWA(pwaConfig)(nextConfig as any);
