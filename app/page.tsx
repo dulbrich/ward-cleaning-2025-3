@@ -97,13 +97,19 @@ export default async function Home() {
               </li>
             </ul>
           </div>
-          <div className="md:w-1/2">
-            <div className="relative h-[400px] rounded-lg overflow-hidden border">
+          <div className="md:w-1/2 flex justify-center items-center">
+            <div className="max-w-full w-full border rounded-lg overflow-hidden">
               <Image 
-                src="/images/app-example-2.png"
+                src="/images/app-example-2.png?v=1"
                 alt="Ward Cleaning App interface example"
-                fill
-                className="object-cover"
+                width={800}
+                height={600}
+                style={{ 
+                  width: '100%',
+                  height: 'auto',
+                  maxHeight: '500px',
+                  objectFit: 'contain'
+                }}
                 priority
               />
             </div>
