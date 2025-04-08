@@ -2,32 +2,32 @@
 
 import { Button } from "@/components/ui/button";
 import {
-  Card,
-  CardContent,
-  CardFooter,
-  CardHeader,
-  CardTitle
+    Card,
+    CardContent,
+    CardFooter,
+    CardHeader,
+    CardTitle
 } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createClient } from "@/utils/supabase/client";
 import { format, parse, parseISO } from "date-fns";
 import {
-  Check,
-  CheckCircle2,
-  ChevronDown,
-  MessageSquare,
-  RefreshCw,
-  Search,
-  Star,
-  X
+    Check,
+    CheckCircle2,
+    ChevronDown,
+    MessageSquare,
+    RefreshCw,
+    Search,
+    Star,
+    X
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -302,12 +302,13 @@ export default function MessengerPage() {
           } else {
             // Map the assigned group to our filter format
             const groupMapping: Record<string, string> = {
-              'Group A': 'A-F',
-              'Group B': 'G-M',
-              'Group C': 'N-S',
-              'Group D': 'T-Z'
+              'A': 'A-F',
+              'B': 'G-M',
+              'C': 'N-S',
+              'D': 'T-Z'
             };
-            setSelectedGroupFilter(groupMapping[schedule.assigned_group] || 'all');
+            const mappedGroup = groupMapping[schedule.assigned_group] || 'all';
+            setSelectedGroupFilter(mappedGroup);
           }
         }
       } catch (error) {
