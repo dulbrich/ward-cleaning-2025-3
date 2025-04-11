@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2, Upload, X } from "lucide-react";
+import { Loader2, X } from "lucide-react";
 import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 import { Alert, AlertDescription } from "../../../components/ui/alert";
@@ -56,6 +56,8 @@ interface WardTask {
   active?: boolean;
   created_by: string;
   template_id?: string;
+  priority?: string;
+  kid_friendly?: boolean;
 }
 
 interface TaskEditorDialogProps {
@@ -377,47 +379,46 @@ export function TaskEditorDialog({
               </div>
             </div>
             
-            <div>
-              <Label>Task Image (Optional)</Label>
-              {imagePreview ? (
-                <div className="mt-2 relative">
-                  <img
-                    src={imagePreview}
-                    alt="Task preview"
-                    className="w-full h-40 object-cover rounded-md"
+            <div className="grid gap-4 py-4">
+              {/* Priority selection */}
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="priority" className="text-right">
+                  Priority
+                </Label>
+                <div className="col-span-3">
+                  <select
+                    id="priority"
+                    name="priority"
+                    className="w-full rounded-md border border-input bg-background px-3 py-2"
+                    value={task.priority || ""}
+                    onChange={(e) => setTask(prev => ({ ...prev, priority: e.target.value }))}
+                  >
+                    <option value="">Normal</option>
+                    <option value="do_first">Do First</option>
+                    <option value="do_last">Do Last</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Kid-friendly checkbox */}
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="kid_friendly" className="text-right">
+                  Kid-friendly
+                </Label>
+                <div className="col-span-3 flex items-center">
+                  <input
+                    type="checkbox"
+                    id="kid_friendly"
+                    name="kid_friendly"
+                    className="mr-2 h-4 w-4 rounded border-gray-300"
+                    checked={task.kid_friendly || false}
+                    onChange={(e) => setTask(prev => ({ ...prev, kid_friendly: e.target.checked }))}
                   />
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    size="sm"
-                    className="absolute top-2 right-2"
-                    onClick={handleRemoveImage}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
+                  <span className="text-sm text-muted-foreground">
+                    This task is suitable for children
+                  </span>
                 </div>
-              ) : (
-                <div className="mt-2">
-                  <Label
-                    htmlFor="image-upload"
-                    className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-md cursor-pointer bg-muted/50 hover:bg-muted"
-                  >
-                    <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                      <Upload className="h-8 w-8 text-muted-foreground mb-2" />
-                      <p className="text-sm text-muted-foreground">
-                        Click to upload an image
-                      </p>
-                    </div>
-                    <Input
-                      id="image-upload"
-                      type="file"
-                      className="hidden"
-                      accept="image/*"
-                      onChange={handleImageUpload}
-                    />
-                  </Label>
-                </div>
-              )}
+              </div>
             </div>
           </div>
           

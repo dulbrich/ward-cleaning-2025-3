@@ -114,8 +114,9 @@ For deleting tasks:
 | instructions| text         | NOT NULL          | Task instructions (rich text)       |
 | equipment   | text         | NOT NULL          | Required equipment (rich text)      |
 | safety      | text         |                   | Safety guidelines (rich text)       |
-| image_url   | varchar(255) |                   | URL to task image                   |
 | color       | varchar(50)  |                   | Color code for task                 |
+| priority    | varchar(50)  |                   | Task priority (do first, do last)   |
+| kid_friendly| boolean      | DEFAULT false     | Whether task is suitable for kids   |
 | active      | boolean      | NOT NULL, DEFAULT true | Task status                    |
 | created_at  | timestamp    | NOT NULL          | Creation timestamp                  |
 | updated_at  | timestamp    | NOT NULL          | Last update timestamp               |
@@ -152,8 +153,9 @@ CREATE TABLE IF NOT EXISTS ward_tasks (
     instructions TEXT NOT NULL,
     equipment TEXT NOT NULL,
     safety TEXT,
-    image_url VARCHAR(255),
     color VARCHAR(50),
+    priority VARCHAR(50),
+    kid_friendly BOOLEAN DEFAULT false,
     active BOOLEAN NOT NULL DEFAULT TRUE,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
@@ -299,6 +301,7 @@ The cleaning tasks templates from "cleaning-cards-5x7-v4.pdf" need to be importe
    - Supports sorting, filtering, and pagination
    - Includes action buttons for CRUD operations
    - Color indicators for tasks
+   - Special "Ghost Duster Buster" icon for vacuuming tasks
 
 2. Template Selection Component:
    - Modal dialog showing available templates
@@ -308,9 +311,17 @@ The cleaning tasks templates from "cleaning-cards-5x7-v4.pdf" need to be importe
 3. Task Edit Component:
    - Form with field validation
    - WYSIWYG editors for rich text fields
-   - Image upload with preview
    - Color picker for selecting task color
+   - Task priority selection (do first, do last, or none)
+   - Kid-friendly checkbox
    - Submit and cancel actions
+
+### Easter Egg Implementation
+
+For tasks that include vacuuming in their title or instructions:
+- A special "Ghost Duster Buster" image will appear with rounded corners
+- This will be automatically detected and applied during task rendering
+- The image will be subtle but noticeable to add a fun element to cleaning tasks
 
 ### Backend Implementation
 
@@ -334,22 +345,9 @@ The cleaning tasks templates from "cleaning-cards-5x7-v4.pdf" need to be importe
 
 ### Image Handling
 
-1. Upload Process:
-   - Client-side image preview
-   - Image optimization before upload
-   - Secure upload to Supabase Storage
-
-2. Storage:
-   - Dedicated bucket for task images
-   - Organized by ward ID for easy management
-   - Access controls to prevent unauthorized access
-
-3. Specifications:
-   - Max image size: 2MB
-   - Accepted formats: JPG, PNG, WebP
-   - Automatic resizing to:
-     - Thumbnail: 200x200px
-     - Display: 800px max width
+The application will use standard images for certain task types:
+- Vacuuming tasks will automatically display the "Ghost Duster Buster" image with rounded corners
+- No custom image upload is required by users
 
 ### Color Handling
 
@@ -377,6 +375,18 @@ The cleaning tasks templates from "cleaning-cards-5x7-v4.pdf" need to be importe
    - HTML or JSON structure (based on chosen editor)
    - Sanitization to prevent XSS attacks
    - Consistent rendering between edit and view modes
+
+### Priority and Kid-Friendly Features
+
+1. Priority Selection:
+   - Tasks can be marked as "do first" or "do last" to help with task sequencing
+   - This assists in creating more efficient cleaning schedules
+   - Visual indicators will show priority status in the task list
+
+2. Kid-Friendly Indicator:
+   - A checkbox to mark tasks suitable for children
+   - Helps ward leaders assign appropriate tasks to families with kids
+   - Clear visual indicator in task list and detail views
 
 ## Technical Considerations
 

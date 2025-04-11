@@ -10,6 +10,7 @@ import { AlertCircle, AlertTriangle, ChevronRight, ClipboardList, Edit, FileText
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import { GhostDusterBuster } from "../../components/GhostDusterBuster";
 import { deleteWardTask, getLastWardDataImport, getTaskTemplates, getWardTasks, logWardDataImport, trackAnonymousUser } from "./actions";
 import RichTextDisplayWithStyles from "./components/RichTextDisplay";
 import { TaskEditorDialogWithStyles as TaskEditorDialog } from "./TaskEditorDialog";
@@ -168,6 +169,8 @@ interface WardTask {
   created_at: string;
   updated_at: string;
   created_by: string;
+  priority?: string;
+  kid_friendly?: boolean;
 }
 
 // Add a component for HTML content rendering (maintained for backward compatibility)
@@ -232,15 +235,29 @@ function TaskList({
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       {tasks.map(task => (
-        <div key={task.id} className="bg-card border rounded-lg overflow-hidden flex flex-col">
+        <div key={task.id} className="bg-card border rounded-lg overflow-hidden flex flex-col h-64">
           {/* Task header with color */}
           <div 
             className="p-4 border-b flex justify-between items-start"
             style={task.color ? { borderLeft: `4px solid ${task.color}` } : {}}
           >
             <div>
-              <h3 className="font-medium">{task.title}</h3>
-              {task.subtitle && <p className="text-sm text-muted-foreground">{task.subtitle}</p>}
+              <h3 className="font-medium truncate max-w-[200px]">{task.title}</h3>
+              {task.subtitle && <p className="text-sm text-muted-foreground truncate max-w-[200px]">{task.subtitle}</p>}
+              <div className="flex flex-wrap gap-1 mt-1">
+                {/* Display task priority if set */}
+                {task.priority && (
+                  <Badge variant={task.priority === 'do_first' ? 'destructive' : 'default'} className="text-xs">
+                    {task.priority === 'do_first' ? 'Do First' : 'Do Last'}
+                  </Badge>
+                )}
+                {/* Display kid-friendly badge if true */}
+                {task.kid_friendly && (
+                  <Badge variant="secondary" className="text-xs">
+                    Kid-friendly
+                  </Badge>
+                )}
+              </div>
             </div>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -274,10 +291,19 @@ function TaskList({
             </div>
           )}
 
-          {/* Task preview content */}
-          <div className="p-4 flex-1 overflow-hidden">
-            <div className="line-clamp-3 text-sm">
-              <HtmlContent html={task.instructions} />
+          {/* Task preview content - Updated for compact square layout */}
+          <div className="p-4 flex-grow overflow-hidden flex flex-col">
+            {/* Instructions - truncated */}
+            <div>
+              <h4 className="text-xs font-medium text-muted-foreground mb-1">Instructions</h4>
+              <div className="text-sm line-clamp-3 overflow-hidden">
+                <HtmlContent html={task.instructions} />
+              </div>
+            </div>
+            
+            {/* Ghost Duster Buster Easter Egg - compact version */}
+            <div className="mt-auto">
+              <GhostDusterBuster title={task.title} instructions={task.instructions} />
             </div>
           </div>
 

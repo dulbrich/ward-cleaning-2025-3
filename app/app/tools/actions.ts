@@ -53,6 +53,8 @@ interface WardTask {
   created_at: string;
   updated_at: string;
   created_by: string;
+  priority?: string;
+  kid_friendly?: boolean;
 }
 
 /**
@@ -702,6 +704,8 @@ export async function createWardTask(task: {
   color?: string;
   active: boolean;
   created_by: string;
+  priority?: string;
+  kid_friendly?: boolean;
 }) {
   try {
     const supabase = await createClient();
@@ -743,6 +747,8 @@ export async function updateWardTask(task: {
   image_url?: string;
   color?: string;
   active: boolean;
+  priority?: string;
+  kid_friendly?: boolean;
 }) {
   try {
     const supabase = await createClient();
