@@ -241,9 +241,9 @@ function TaskList({
             className="p-4 border-b flex justify-between items-start"
             style={task.color ? { borderLeft: `4px solid ${task.color}` } : {}}
           >
-            <div>
-              <h3 className="font-medium truncate max-w-[200px]">{task.title}</h3>
-              {task.subtitle && <p className="text-sm text-muted-foreground truncate max-w-[200px]">{task.subtitle}</p>}
+            <div className="flex-1 min-w-0 pr-2">
+              <h3 className="font-medium truncate">{task.title}</h3>
+              {task.subtitle && <p className="text-sm text-muted-foreground truncate">{task.subtitle}</p>}
               <div className="flex flex-wrap gap-1 mt-1">
                 {/* Display task priority if set */}
                 {task.priority && (
@@ -262,25 +262,27 @@ function TaskList({
                 )}
               </div>
             </div>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button className="p-2 hover:bg-muted rounded">
-                  <MoreHorizontal className="h-4 w-4" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                <DropdownMenuItem onClick={() => onEdit(task)}>
-                  <Edit className="h-4 w-4 mr-2" /> Edit Task
-                </DropdownMenuItem>
-                <DropdownMenuItem 
-                  onClick={() => onDelete(task.id || '')}
-                  className="text-destructive focus:text-destructive"
-                >
-                  <Trash2 className="h-4 w-4 mr-2" /> Delete Task
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <div className="flex-shrink-0">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="p-2 hover:bg-muted rounded">
+                    <MoreHorizontal className="h-4 w-4" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                  <DropdownMenuItem onClick={() => onEdit(task)}>
+                    <Edit className="h-4 w-4 mr-2" /> Edit Task
+                  </DropdownMenuItem>
+                  <DropdownMenuItem 
+                    onClick={() => onDelete(task.id || '')}
+                    className="text-destructive focus:text-destructive"
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" /> Delete Task
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </div>
 
           {/* Task image */}
@@ -401,7 +403,10 @@ function TemplateSelectionDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-3xl max-h-[85vh] overflow-y-auto">
+      <DialogContent 
+        className="sm:max-w-3xl max-h-[90vh] overflow-y-auto" 
+        style={{ position: 'fixed', top: '5vh', transform: 'translateY(0) translateX(-50%)' }}
+      >
         <DialogHeader>
           <DialogTitle className="text-xl">Select a Task Template</DialogTitle>
         </DialogHeader>
@@ -805,7 +810,10 @@ function TaskBuilderTool({ wardBranches, selectedWard, authError }: {
 
       {/* Delete confirmation dialog */}
       <Dialog open={isConfirmDeleteOpen} onOpenChange={setIsConfirmDeleteOpen}>
-        <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
+        <DialogContent 
+          className="sm:max-w-md max-h-[90vh] overflow-y-auto"
+          style={{ position: 'fixed', top: '5vh', transform: 'translateY(0) translateX(-50%)' }}
+        >
           <DialogHeader>
             <DialogTitle className="text-xl">Delete Task</DialogTitle>
           </DialogHeader>

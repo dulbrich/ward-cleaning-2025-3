@@ -273,8 +273,16 @@ export function TaskEditorDialog({
   };
   
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+    <Dialog 
+      open={isOpen} 
+      onOpenChange={open => {
+        if (!open) onClose();
+      }}
+    >
+      <DialogContent 
+        className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto top-[5vh] translate-y-0"
+        style={{ position: 'fixed', top: '5vh', transform: 'translateY(0) translateX(-50%)' }}
+      >
         <DialogHeader>
           <DialogTitle>{initialTask ? 'Edit Task' : 'Create New Task'}</DialogTitle>
           <DialogDescription>
