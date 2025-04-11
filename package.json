@@ -36,6 +36,7 @@
     "react-dom": "19.0.0",
     "react-imask": "^7.6.1",
     "react-input-mask": "^2.0.4",
+    "react-simple-wysiwyg": "^3.2.2",
     "react-syntax-highlighter": "^15.6.1",
     "sonner": "^2.0.3",
     "zod": "^3.22.4"

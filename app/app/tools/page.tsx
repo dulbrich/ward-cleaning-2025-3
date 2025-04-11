@@ -4,15 +4,15 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
 import { createClient } from "@/utils/supabase/client";
-import { AlertCircle, AlertTriangle, Check, ChevronRight, ClipboardList, Edit, FileText, Loader2, MoreHorizontal, Plus, RefreshCw, Search, Trash2, Upload, X } from "lucide-react";
+import { AlertCircle, AlertTriangle, ChevronRight, ClipboardList, Edit, FileText, Loader2, MoreHorizontal, Plus, RefreshCw, Search, Trash2 } from "lucide-react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from "react";
-import { createWardTask, deleteWardTask, getLastWardDataImport, getTaskTemplates, getWardTasks, logWardDataImport, trackAnonymousUser, updateWardTask, uploadTaskImage } from "./actions";
+import { useEffect, useMemo, useState } from "react";
+import { deleteWardTask, getLastWardDataImport, getTaskTemplates, getWardTasks, logWardDataImport, trackAnonymousUser } from "./actions";
+import RichTextDisplayWithStyles from "./components/RichTextDisplay";
+import { TaskEditorDialogWithStyles as TaskEditorDialog } from "./TaskEditorDialog";
 
 // Dynamically import SyntaxHighlighter to prevent SSR issues
 const DynamicSyntaxHighlighter = dynamic(
@@ -154,7 +154,7 @@ interface TaskTemplate {
 }
 
 interface WardTask {
-  id: string;
+  id?: string;
   ward_id: string;
   template_id?: string;
   title: string;
@@ -170,11 +170,9 @@ interface WardTask {
   created_by: string;
 }
 
-// Add a component for HTML content rendering
+// Add a component for HTML content rendering (maintained for backward compatibility)
 function HtmlContent({ html }: { html: string }) {
-  return (
-    <div className="prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: html }} />
-  );
+  return <RichTextDisplayWithStyles html={html} />;
 }
 
 // Task color options
@@ -197,7 +195,8 @@ const TASK_CATEGORIES = [
   "Restrooms",
   "General",
   "Exterior",
-  "Classroom"
+  "Windows",
+  "Other"
 ];
 
 // Task List component
@@ -255,7 +254,7 @@ function TaskList({
                   <Edit className="h-4 w-4 mr-2" /> Edit Task
                 </DropdownMenuItem>
                 <DropdownMenuItem 
-                  onClick={() => onDelete(task.id)}
+                  onClick={() => onDelete(task.id || '')}
                   className="text-destructive focus:text-destructive"
                 >
                   <Trash2 className="h-4 w-4 mr-2" /> Delete Task
@@ -488,360 +487,6 @@ function TemplateSelectionDialog({
   );
 }
 
-// Task Editor Dialog Component
-function TaskEditorDialog({
-  isOpen,
-  onClose,
-  initialTask,
-  wardId,
-  onSave,
-  userId
-}: {
-  isOpen: boolean;
-  onClose: () => void;
-  initialTask?: Partial<WardTask>;
-  wardId: string;
-  onSave: () => void;
-  userId: string;
-}) {
-  const [task, setTask] = useState<Partial<WardTask>>({
-    title: '',
-    subtitle: '',
-    instructions: '',
-    equipment: '',
-    safety: '',
-    color: '',
-    active: true,
-    ward_id: wardId,
-    created_by: userId
-  });
-
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [isImageUploading, setIsImageUploading] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // Reset form when the dialog opens with new initialTask
-  useEffect(() => {
-    if (isOpen && initialTask) {
-      setTask({ 
-        ...initialTask,
-        ward_id: wardId,
-        created_by: userId 
-      });
-    } else if (isOpen) {
-      setTask({
-        title: '',
-        subtitle: '',
-        instructions: '',
-        equipment: '',
-        safety: '',
-        color: '',
-        active: true,
-        ward_id: wardId,
-        created_by: userId
-      });
-    }
-    setError(null);
-  }, [isOpen, initialTask, wardId, userId]);
-
-  // Handle form field changes
-  const handleChange = (
-    e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
-  ) => {
-    const { name, value } = e.target;
-    setTask(prev => ({ ...prev, [name]: value }));
-  };
-
-  // Handle checkbox changes
-  const handleCheckboxChange = (e: ChangeEvent<HTMLInputElement>) => {
-    const { name, checked } = e.target;
-    setTask(prev => ({ ...prev, [name]: checked }));
-  };
-
-  // Handle color selection
-  const handleColorChange = (color: string) => {
-    setTask(prev => ({ ...prev, color }));
-  };
-
-  // Handle form submission
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      if (!task.title || !task.instructions || !task.equipment) {
-        throw new Error('Please fill out all required fields');
-      }
-
-      if (task.id) {
-        // Update existing task
-        const { id, created_at, updated_at, created_by, ...updates } = task as WardTask;
-        const result = await updateWardTask(id, updates);
-        if (!result.success) {
-          throw new Error(result.error || 'Failed to update task');
-        }
-      } else {
-        // Create new task
-        const result = await createWardTask(task as Omit<WardTask, 'id' | 'created_at' | 'updated_at'>);
-        if (!result.success) {
-          throw new Error(result.error || 'Failed to create task');
-        }
-      }
-
-      onSave();
-      onClose();
-    } catch (err) {
-      console.error('Error saving task:', err);
-      setError(err instanceof Error ? err.message : 'An unexpected error occurred');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Handle image upload
-  const handleImageUpload = async (e: ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files || e.target.files.length === 0) return;
-    
-    const file = e.target.files[0];
-    setIsImageUploading(true);
-    
-    try {
-      const result = await uploadTaskImage(wardId, file);
-      if (result.success && result.data) {
-        setTask(prev => ({ ...prev, image_url: result.data.url }));
-      } else {
-        throw new Error(result.error || 'Failed to upload image');
-      }
-    } catch (err) {
-      console.error('Error uploading image:', err);
-      setError(err instanceof Error ? err.message : 'An unexpected error occurred with image upload');
-    } finally {
-      setIsImageUploading(false);
-      // Reset file input
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
-    }
-  };
-
-  // Handle image removal
-  const handleRemoveImage = () => {
-    setTask(prev => ({ ...prev, image_url: undefined }));
-  };
-
-  return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="text-xl">
-            {task.id ? 'Edit Task' : 'Create New Task'}
-          </DialogTitle>
-        </DialogHeader>
-
-        <form onSubmit={handleSubmit} className="space-y-6 py-4">
-          {/* Error display */}
-          {error && (
-            <div className="bg-destructive/10 text-destructive p-4 rounded-lg flex items-start gap-3">
-              <AlertTriangle className="h-5 w-5 flex-shrink-0 mt-0.5" />
-              <div>
-                <p className="font-medium">Error saving task</p>
-                <p className="text-sm">{error}</p>
-              </div>
-            </div>
-          )}
-          
-          {/* Title & Subtitle */}
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="title" className="flex items-center">
-                Title <span className="text-destructive ml-1">*</span>
-              </Label>
-              <Input
-                id="title"
-                name="title"
-                value={task.title || ''}
-                onChange={handleChange}
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="subtitle">Subtitle (Optional)</Label>
-              <Input
-                id="subtitle"
-                name="subtitle"
-                value={task.subtitle || ''}
-                onChange={handleChange}
-              />
-            </div>
-          </div>
-          
-          {/* Main fields: Instructions, Equipment, Safety */}
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="instructions" className="flex items-center">
-                Instructions <span className="text-destructive ml-1">*</span>
-              </Label>
-              <Textarea
-                id="instructions"
-                name="instructions"
-                value={task.instructions || ''}
-                onChange={handleChange}
-                rows={6}
-                required
-              />
-              <p className="text-xs text-muted-foreground">
-                HTML formatting is supported (e.g., &lt;ol&gt;, &lt;ul&gt;, &lt;li&gt;, &lt;p&gt;, &lt;strong&gt;)
-              </p>
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="equipment" className="flex items-center">
-                Equipment <span className="text-destructive ml-1">*</span>
-              </Label>
-              <Textarea
-                id="equipment"
-                name="equipment"
-                value={task.equipment || ''}
-                onChange={handleChange}
-                rows={4}
-                required
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="safety">Safety Guidelines (Optional)</Label>
-              <Textarea
-                id="safety"
-                name="safety"
-                value={task.safety || ''}
-                onChange={handleChange}
-                rows={3}
-              />
-            </div>
-          </div>
-          
-          {/* Image Upload */}
-          <div className="space-y-2">
-            <Label>Task Image (Optional)</Label>
-            
-            {task.image_url ? (
-              <div className="relative rounded-lg overflow-hidden border">
-                <img 
-                  src={task.image_url} 
-                  alt="Task" 
-                  className="w-full h-48 object-cover"
-                />
-                <button
-                  type="button"
-                  className="absolute top-2 right-2 p-1 bg-background/80 rounded-full hover:bg-background"
-                  onClick={handleRemoveImage}
-                >
-                  <X className="h-5 w-5" />
-                </button>
-              </div>
-            ) : (
-              <div className="border border-dashed rounded-lg p-6 text-center">
-                <input
-                  type="file"
-                  id="image"
-                  ref={fileInputRef}
-                  accept="image/*"
-                  onChange={handleImageUpload}
-                  className="hidden"
-                />
-                
-                {isImageUploading ? (
-                  <div className="flex flex-col items-center">
-                    <Loader2 className="h-8 w-8 animate-spin text-primary mb-2" />
-                    <p className="text-sm">Uploading image...</p>
-                  </div>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="flex flex-col items-center w-full"
-                  >
-                    <Upload className="h-8 w-8 text-primary mb-2" />
-                    <p>Click to upload an image</p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      JPG, PNG or WebP. 2MB max.
-                    </p>
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
-          
-          {/* Color Selection */}
-          <div className="space-y-2">
-            <Label>Task Color (Optional)</Label>
-            <div className="flex flex-wrap gap-3">
-              {TASK_COLORS.map(color => (
-                <button
-                  key={color.value}
-                  type="button"
-                  className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                    task.color === color.value ? 'ring-2 ring-primary ring-offset-2' : ''
-                  }`}
-                  style={{ 
-                    backgroundColor: color.value || '#e2e8f0',
-                  }}
-                  title={color.name}
-                  onClick={() => handleColorChange(color.value)}
-                >
-                  {task.color === color.value && <Check className="h-4 w-4 text-white" />}
-                </button>
-              ))}
-            </div>
-          </div>
-          
-          {/* Status */}
-          <div className="flex items-center space-x-2">
-            <input
-              type="checkbox"
-              id="active"
-              name="active"
-              checked={task.active !== false}
-              onChange={handleCheckboxChange}
-              className="rounded border-gray-300 text-primary focus:ring-primary"
-            />
-            <Label htmlFor="active">Active</Label>
-          </div>
-          
-          <DialogFooter>
-            <button
-              type="button"
-              className="px-4 py-2 rounded-md text-sm font-medium bg-muted hover:bg-muted/80"
-              onClick={onClose}
-              disabled={isLoading}
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className={`px-4 py-2 rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 ${
-                isLoading ? 'opacity-70 cursor-not-allowed' : ''
-              }`}
-              disabled={isLoading}
-            >
-              {isLoading ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin mr-2 inline-block" />
-                  {task.id ? 'Updating...' : 'Creating...'}
-                </>
-              ) : (
-                task.id ? 'Update Task' : 'Create Task'
-              )}
-            </button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
 // Task Builder Component
 function TaskBuilderTool({ wardBranches, selectedWard, authError }: {
   wardBranches: WardBranch[];
@@ -911,7 +556,6 @@ function TaskBuilderTool({ wardBranches, selectedWard, authError }: {
   const handleSelectTemplate = (template: TaskTemplate) => {
     setIsTemplateDialogOpen(false);
     setEditingTask({
-      id: '',
       ward_id: selectedWard,
       template_id: template.id,
       title: template.title,
@@ -931,6 +575,12 @@ function TaskBuilderTool({ wardBranches, selectedWard, authError }: {
 
   // Handle edit task
   const handleEditTask = (task: WardTask) => {
+    // Make sure the task has an ID before editing
+    if (!task.id) {
+      console.error("Cannot edit task without ID");
+      setError("Cannot edit task: Missing ID");
+      return;
+    }
     setEditingTask(task);
     setIsTaskEditorOpen(true);
   };
@@ -948,7 +598,11 @@ function TaskBuilderTool({ wardBranches, selectedWard, authError }: {
 
   // Handle delete confirmation
   const handleConfirmDelete = async () => {
-    if (!deleteTaskId) return;
+    if (!deleteTaskId) {
+      setError('Cannot delete: No task ID provided');
+      setIsConfirmDeleteOpen(false);
+      return;
+    }
     
     setIsDeleting(true);
     
@@ -1074,23 +728,55 @@ function TaskBuilderTool({ wardBranches, selectedWard, authError }: {
       />
 
       {/* Task editor dialog */}
-      {userId && (
+      {userId && selectedWard ? (
         <TaskEditorDialog
           isOpen={isTaskEditorOpen}
           onClose={() => {
             setIsTaskEditorOpen(false);
             setEditingTask(undefined);
           }}
-          initialTask={editingTask}
+          initialTask={editingTask || null}
           wardId={selectedWard}
           onSave={handleTaskSave}
           userId={userId}
         />
-      )}
+      ) : isTaskEditorOpen && (!userId || !selectedWard) ? (
+        <Dialog
+          open={isTaskEditorOpen}
+          onOpenChange={(open) => !open && setIsTaskEditorOpen(false)}
+        >
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Required Information Missing</DialogTitle>
+            </DialogHeader>
+            <div className="py-6">
+              <p className="text-destructive font-semibold">
+                {!userId && !selectedWard 
+                  ? "User ID and Ward ID are missing" 
+                  : !userId 
+                    ? "User ID is missing" 
+                    : "Ward ID is missing"
+                }
+              </p>
+              <p className="mt-2">
+                Please refresh the page and try again. If the issue persists, please contact support.
+              </p>
+            </div>
+            <DialogFooter>
+              <button
+                className="px-4 py-2 rounded-md text-sm font-medium bg-primary text-primary-foreground"
+                onClick={() => setIsTaskEditorOpen(false)}
+              >
+                Close
+              </button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      ) : null}
 
       {/* Delete confirmation dialog */}
       <Dialog open={isConfirmDeleteOpen} onOpenChange={setIsConfirmDeleteOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-xl">Delete Task</DialogTitle>
           </DialogHeader>

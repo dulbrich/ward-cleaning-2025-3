@@ -2,6 +2,7 @@
 
 import { createClient } from "@/utils/supabase/server";
 import { createHash } from "crypto";
+import { revalidatePath } from "next/cache";
 
 // Define types for our objects
 interface AnonymousUser {
@@ -643,127 +644,128 @@ export async function getWardTasks(wardId: string) {
 }
 
 /**
- * Create a new task for a ward
+ * Fetch all tasks for a specific ward
  */
-export async function createWardTask(task: Omit<WardTask, 'id' | 'created_at' | 'updated_at'>) {
+export async function fetchWardTasks(wardId: string) {
   try {
     const supabase = await createClient();
     
-    // Check if user is authenticated
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      return { success: false, error: "Not authenticated" };
-    }
-
-    // Check if user owns the ward
-    const { data: wardData, error: wardError } = await supabase
-      .from('ward_branches')
-      .select('user_id')
-      .eq('id', task.ward_id)
-      .single();
-      
-    if (wardError || !wardData) {
-      return { 
-        success: false, 
-        error: "Ward not found or access denied"
-      };
-    }
-    
-    if (wardData.user_id !== user.id) {
-      return { 
-        success: false, 
-        error: "You don't have permission to add tasks to this ward"
-      };
-    }
-    
-    // Create task
     const { data, error } = await supabase
       .from('ward_tasks')
-      .insert([task])
+      .select('*')
+      .eq('ward_id', wardId)
+      .order('title');
+    
+    if (error) throw error;
+    
+    return { success: true, data };
+  } catch (error) {
+    console.error("Error fetching ward tasks:", error);
+    return { success: false, error: (error as Error).message };
+  }
+}
+
+/**
+ * Fetch active task templates
+ */
+export async function fetchTaskTemplates() {
+  try {
+    const supabase = await createClient();
+    
+    const { data, error } = await supabase
+      .from('task_templates')
+      .select('*')
+      .eq('active', true)
+      .order('title');
+    
+    if (error) throw error;
+    
+    return { success: true, data };
+  } catch (error) {
+    console.error("Error fetching task templates:", error);
+    return { success: false, error: (error as Error).message };
+  }
+}
+
+/**
+ * Create a new ward task
+ */
+export async function createWardTask(task: {
+  ward_id: string;
+  template_id?: string;
+  title: string;
+  subtitle?: string;
+  instructions: string;
+  equipment: string;
+  safety?: string;
+  image_url?: string;
+  color?: string;
+  active: boolean;
+  created_by: string;
+}) {
+  try {
+    const supabase = await createClient();
+    
+    const { data, error } = await supabase
+      .from('ward_tasks')
+      .insert([{
+        ...task,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }])
       .select()
       .single();
     
-    if (error) {
-      return { 
-        success: false, 
-        error: `Error creating task: ${error.message}`
-      };
-    }
+    if (error) throw error;
     
-    return {
-      success: true,
-      data: data as WardTask
-    };
+    // Revalidate the path to update the UI
+    revalidatePath(`/app/tools/cleaning-tasks`);
+    
+    return { success: true, data };
   } catch (error) {
     console.error("Error creating ward task:", error);
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : "Error creating ward task"
-    };
+    return { success: false, error: (error as Error).message };
   }
 }
 
 /**
  * Update an existing ward task
  */
-export async function updateWardTask(taskId: string, taskUpdates: Partial<Omit<WardTask, 'id' | 'created_at' | 'updated_at' | 'created_by'>>) {
+export async function updateWardTask(task: {
+  id: string;
+  ward_id: string;
+  template_id?: string;
+  title: string;
+  subtitle?: string;
+  instructions: string;
+  equipment: string;
+  safety?: string;
+  image_url?: string;
+  color?: string;
+  active: boolean;
+}) {
   try {
     const supabase = await createClient();
     
-    // Check if user is authenticated
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      return { success: false, error: "Not authenticated" };
-    }
-    
-    // First get the task to check permissions
-    const { data: existingTask, error: getError } = await supabase
-      .from('ward_tasks')
-      .select('*, ward_branches!inner(user_id)')
-      .eq('id', taskId)
-      .single();
-    
-    if (getError || !existingTask) {
-      return { 
-        success: false, 
-        error: "Task not found or access denied"
-      };
-    }
-    
-    // Check if user owns the ward
-    const ward = existingTask.ward_branches as any;
-    if (ward.user_id !== user.id) {
-      return { 
-        success: false, 
-        error: "You don't have permission to update this task"
-      };
-    }
-    
-    // Update task
     const { data, error } = await supabase
       .from('ward_tasks')
-      .update(taskUpdates)
-      .eq('id', taskId)
+      .update({
+        ...task,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', task.id)
       .select()
       .single();
     
-    if (error) {
-      return { 
-        success: false, 
-        error: `Error updating task: ${error.message}`
-      };
-    }
+    if (error) throw error;
     
-    return {
-      success: true,
-      data: data as WardTask
-    };
+    // Revalidate the path to update the UI
+    revalidatePath(`/app/tools/cleaning-tasks`);
+    
+    return { success: true, data };
   } catch (error) {
     console.error("Error updating ward task:", error);
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : "Error updating ward task"
-    };
+    return { success: false, error: (error as Error).message };
   }
 }
 
@@ -774,132 +776,56 @@ export async function deleteWardTask(taskId: string) {
   try {
     const supabase = await createClient();
     
-    // Check if user is authenticated
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      return { success: false, error: "Not authenticated" };
-    }
-    
-    // First get the task to check permissions
-    const { data: existingTask, error: getError } = await supabase
-      .from('ward_tasks')
-      .select('*, ward_branches!inner(user_id)')
-      .eq('id', taskId)
-      .single();
-    
-    if (getError || !existingTask) {
-      return { 
-        success: false, 
-        error: "Task not found or access denied"
-      };
-    }
-    
-    // Check if user owns the ward
-    const ward = existingTask.ward_branches as any;
-    if (ward.user_id !== user.id) {
-      return { 
-        success: false, 
-        error: "You don't have permission to delete this task"
-      };
-    }
-    
-    // Delete task
     const { error } = await supabase
       .from('ward_tasks')
       .delete()
       .eq('id', taskId);
     
-    if (error) {
-      return { 
-        success: false, 
-        error: `Error deleting task: ${error.message}`
-      };
-    }
+    if (error) throw error;
     
-    return {
-      success: true
-    };
+    // Revalidate the path to update the UI
+    revalidatePath(`/app/tools/cleaning-tasks`);
+    
+    return { success: true };
   } catch (error) {
     console.error("Error deleting ward task:", error);
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : "Error deleting ward task"
-    };
+    return { success: false, error: (error as Error).message };
   }
 }
 
 /**
- * Upload a task image to Supabase storage
+ * Upload an image for a task
  */
-export async function uploadTaskImage(wardId: string, file: File) {
+export async function uploadTaskImage(file: File) {
   try {
     const supabase = await createClient();
     
-    // Check if user is authenticated
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      return { success: false, error: "Not authenticated" };
-    }
-    
-    // Check if user owns the ward
-    const { data: wardData, error: wardError } = await supabase
-      .from('ward_branches')
-      .select('user_id')
-      .eq('id', wardId)
-      .single();
-      
-    if (wardError || !wardData) {
-      return { 
-        success: false, 
-        error: "Ward not found or access denied"
-      };
-    }
-    
-    if (wardData.user_id !== user.id) {
-      return { 
-        success: false, 
-        error: "You don't have permission to upload images to this ward"
-      };
-    }
-    
     // Generate a unique filename
     const fileExt = file.name.split('.').pop();
-    const fileName = `${wardId}/${Date.now()}.${fileExt}`;
+    const fileName = `${Math.random().toString(36).substring(2, 15)}_${Date.now()}.${fileExt}`;
+    const filePath = `task-images/${fileName}`;
     
-    // Upload file
-    const { data, error } = await supabase
-      .storage
-      .from('task-images')
-      .upload(fileName, file, {
-        contentType: file.type,
-        upsert: false
-      });
+    // Upload the file
+    const { error: uploadError } = await supabase.storage
+      .from('ward-assets')
+      .upload(filePath, file);
     
-    if (error) {
-      return { 
-        success: false, 
-        error: `Error uploading image: ${error.message}`
-      };
-    }
+    if (uploadError) throw uploadError;
     
-    // Get public URL
-    const { data: { publicUrl } } = supabase
-      .storage
-      .from('task-images')
-      .getPublicUrl(data.path);
+    // Get the public URL
+    const { data: { publicUrl } } = supabase.storage
+      .from('ward-assets')
+      .getPublicUrl(filePath);
     
-    return {
-      success: true,
-      data: {
-        path: data.path,
-        url: publicUrl
-      }
+    return { 
+      success: true, 
+      data: { 
+        path: filePath, 
+        url: publicUrl 
+      } 
     };
   } catch (error) {
     console.error("Error uploading task image:", error);
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : "Error uploading task image"
-    };
+    return { success: false, error: (error as Error).message };
   }
 } 
