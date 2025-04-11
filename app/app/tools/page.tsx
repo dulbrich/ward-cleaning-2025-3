@@ -253,7 +253,10 @@ function TaskList({
                 )}
                 {/* Display kid-friendly badge if true */}
                 {task.kid_friendly && (
-                  <Badge variant="secondary" className="text-xs">
+                  <Badge 
+                    variant="outline" 
+                    className="text-xs bg-[#ec4899] text-white hover:bg-[#ec4899] hover:text-white"
+                  >
                     Kid-friendly
                   </Badge>
                 )}
