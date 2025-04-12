@@ -55,6 +55,7 @@ interface WardTask {
   created_by: string;
   priority?: string;
   kid_friendly?: boolean;
+  points?: number;
 }
 
 /**
@@ -706,6 +707,7 @@ export async function createWardTask(task: {
   created_by: string;
   priority?: string;
   kid_friendly?: boolean;
+  points?: number;
 }) {
   try {
     const supabase = await createClient();
@@ -749,6 +751,7 @@ export async function updateWardTask(task: {
   active: boolean;
   priority?: string;
   kid_friendly?: boolean;
+  points?: number;
 }) {
   try {
     const supabase = await createClient();

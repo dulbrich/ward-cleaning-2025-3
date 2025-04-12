@@ -171,6 +171,7 @@ interface WardTask {
   created_by: string;
   priority?: string;
   kid_friendly?: boolean;
+  points?: number;
 }
 
 // Add a component for HTML content rendering (maintained for backward compatibility)
@@ -260,6 +261,13 @@ function TaskList({
                     Kid-friendly
                   </Badge>
                 )}
+                {/* Display points value */}
+                <Badge 
+                  variant="outline" 
+                  className="text-xs bg-amber-500 text-white hover:bg-amber-500 hover:text-white"
+                >
+                  {task.points || 5} pts
+                </Badge>
               </div>
             </div>
             <div className="flex-shrink-0">

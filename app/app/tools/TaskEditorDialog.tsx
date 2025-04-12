@@ -58,6 +58,7 @@ interface WardTask {
   template_id?: string;
   priority?: string;
   kid_friendly?: boolean;
+  points?: number;
 }
 
 interface TaskEditorDialogProps {
@@ -425,6 +426,28 @@ export function TaskEditorDialog({
                   <span className="text-sm text-muted-foreground">
                     This task is suitable for children
                   </span>
+                </div>
+              </div>
+              
+              {/* Points selection */}
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="points" className="text-right">
+                  Points
+                </Label>
+                <div className="col-span-3">
+                  <select
+                    id="points"
+                    name="points"
+                    className="w-full rounded-md border border-input bg-background px-3 py-2"
+                    value={task.points || 5}
+                    onChange={(e) => setTask(prev => ({ ...prev, points: parseInt(e.target.value) }))}
+                  >
+                    <option value="5">5 points (Easy)</option>
+                    <option value="10">10 points</option>
+                    <option value="15">15 points (Medium)</option>
+                    <option value="20">20 points</option>
+                    <option value="25">25 points (Hard)</option>
+                  </select>
                 </div>
               </div>
             </div>
