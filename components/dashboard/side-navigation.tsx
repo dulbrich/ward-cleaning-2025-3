@@ -179,6 +179,33 @@ export default function SideNavigation({
               </a>
             </li>
             
+            {/* Tasks Link */}
+            <li>
+              <a
+                href="/protected/tasks"
+                className={`
+                  flex items-center rounded-md px-2 py-2 text-sm
+                  ${pathname.startsWith('/protected/tasks') 
+                    ? 'bg-primary text-white' 
+                    : 'text-slate-300 hover:bg-slate-800 hover:text-white'}
+                `}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" />
+                  <path fillRule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clipRule="evenodd" />
+                </svg>
+                {expanded && (
+                  <div className="ml-3 flex items-center justify-between w-full">
+                    <span>Tasks</span>
+                    <span className="inline-flex items-center justify-center w-5 h-5 bg-blue-500 text-white text-xs rounded-full ml-1">3</span>
+                  </div>
+                )}
+                {!expanded && (
+                  <span className="absolute left-11 top-1.5 inline-flex items-center justify-center w-5 h-5 bg-blue-500 text-white text-xs rounded-full">3</span>
+                )}
+              </a>
+            </li>
+            
             {/* Assignments Link */}
             <li>
               <a

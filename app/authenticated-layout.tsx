@@ -159,7 +159,7 @@ export default function AuthenticatedLayout({
       title: "Tasks",
       href: "/app/tasks",
       icon: <ClipboardList size={24} />,
-      active: pathname === "/app/tasks",
+      active: pathname.startsWith("/app/tasks"),
       badge: 3
     }
   ];
