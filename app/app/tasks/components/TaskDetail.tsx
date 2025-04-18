@@ -78,6 +78,7 @@ interface TaskDetailProps {
   currentUserId: string | null;
   currentParticipant: SessionParticipant | null;
   isAuthenticated: boolean;
+  optimisticUpdateTask: (taskId: string, updateData: Partial<SessionTask>) => void;
 }
 
 const TaskDetail: React.FC<TaskDetailProps> = ({
@@ -87,6 +88,7 @@ const TaskDetail: React.FC<TaskDetailProps> = ({
   currentUserId,
   currentParticipant,
   isAuthenticated,
+  optimisticUpdateTask,
 }) => {
   const supabase = createClient();
   const [taskViewers, setTaskViewers] = useState<TaskViewer[]>([]);
@@ -135,6 +137,8 @@ const TaskDetail: React.FC<TaskDetailProps> = ({
         table: 'task_viewers',
         filter: `session_task_id=eq.${sessionTask.id}`
       }, (payload) => {
+        console.log("TaskDetail real-time update received:", payload.eventType);
+        
         if (payload.eventType === 'INSERT') {
           // Fetch the complete viewer data with participant details
           supabase
@@ -169,51 +173,105 @@ const TaskDetail: React.FC<TaskDetailProps> = ({
     setLoading(true);
     
     try {
-      // Check if someone has already claimed this task
-      const { data: currentTask } = await supabase
-        .from("cleaning_session_tasks")
-        .select("status")
-        .eq("id", sessionTask.id)
-        .single();
-        
-      if (currentTask?.status !== "todo") {
-        toast.error("This task has already been claimed by someone else.");
-        onClose();
-        return;
-      }
-      
       // Current timestamp for consistency
       const now = new Date().toISOString();
       
-      // Update the task status to "doing" and assign to current user
-      const updateData: any = {
+      // Create the update data object for optimistic UI update
+      const uiUpdateData: Partial<SessionTask> = {
         status: "doing",
         assigned_at: now
       };
       
+      let assignToUserId = null;
+      let assignToTempUserId = null;
+      
+      // Add the appropriate assignment field
       if (isAuthenticated && currentUserId) {
-        updateData.assigned_to = currentUserId;
+        uiUpdateData.assigned_to = currentUserId;
+        assignToUserId = currentUserId;
+        
+        // Add assignee info for UI
+        if (currentParticipant) {
+          uiUpdateData.assignee = {
+            display_name: currentParticipant.display_name,
+            avatar_url: currentParticipant.avatar_url
+          };
+        }
       } else if (currentParticipant?.temp_user_id) {
-        updateData.assigned_to_temp_user = currentParticipant.temp_user_id;
+        uiUpdateData.assigned_to_temp_user = currentParticipant.temp_user_id;
+        assignToTempUserId = currentParticipant.temp_user_id;
+        
+        // Add assignee info for UI
+        uiUpdateData.assignee = {
+          display_name: currentParticipant.display_name,
+          avatar_url: currentParticipant.avatar_url
+        };
       } else {
         toast.error("You need to be logged in to claim a task.");
+        setLoading(false);
         return;
       }
       
-      // Close the modal first for better responsiveness
+      console.log("Task assignment data:", JSON.stringify(uiUpdateData));
+      
+      // Optimistically update the UI
+      optimisticUpdateTask(sessionTask.id, uiUpdateData);
+      
+      // Close the modal for better responsiveness
       onClose();
       
-      const { error } = await supabase
-        .from("cleaning_session_tasks")
-        .update(updateData)
-        .eq("id", sessionTask.id);
-        
-      if (error) throw error;
+      // Use the server API to update the task
+      const response = await fetch('/api/tasks/assign', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          taskId: sessionTask.id,
+          assignToUserId,
+          assignToTempUserId
+        })
+      });
       
-      toast.success("Task assigned to you!");
+      const result = await response.json();
+      
+      if (!response.ok) {
+        console.error("Server error assigning task:", result);
+        
+        if (response.status === 409) {
+          // Conflict - someone else claimed it first
+          toast.error("This task has already been claimed by someone else.");
+        } else {
+          throw new Error(result.error || "Failed to assign task");
+        }
+      } else {
+        console.log("Task assignment successful:", result);
+        toast.success("Task assigned to you!");
+        
+        // Apply the server response data if it includes the task
+        if (result.task) {
+          const serverTask = result.task;
+          const serverAssignee = result.assignee;
+          
+          // Apply server data with assignee info
+          optimisticUpdateTask(sessionTask.id, {
+            ...serverTask,
+            assignee: serverAssignee
+          });
+        }
+      }
     } catch (error) {
       console.error("Error assigning task:", error);
       toast.error("Failed to assign task. Please try again.");
+      
+      // Revert the optimistic update on error
+      optimisticUpdateTask(sessionTask.id, {
+        status: "todo",
+        assigned_to: undefined,
+        assigned_to_temp_user: undefined,
+        assigned_at: undefined,
+        assignee: undefined
+      });
     } finally {
       setLoading(false);
     }
@@ -225,21 +283,48 @@ const TaskDetail: React.FC<TaskDetailProps> = ({
     setLoading(true);
     
     try {
-      const { error } = await supabase
-        .from("cleaning_session_tasks")
-        .update({
-          status: "done",
-          completed_at: new Date().toISOString()
-        })
-        .eq("id", sessionTask.id);
-        
-      if (error) throw error;
-      
-      toast.success("Task marked as complete!");
+      // Close the modal immediately for better UX
       onClose();
+      
+      // Show loading toast
+      const toastId = toast.loading("Completing task...");
+      
+      try {
+        // Optimistically update the UI first for better responsiveness
+        optimisticUpdateTask(sessionTask.id, {
+          status: "done" as const,
+          completed_at: new Date().toISOString()
+        });
+        
+        // Use the server-side API endpoint that bypasses triggers
+        const response = await fetch('/api/tasks/complete', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            taskId: sessionTask.id
+          })
+        });
+        
+        const result = await response.json();
+        console.log("API response:", result);
+        
+        if (!response.ok) {
+          throw new Error(result.error || 'Failed to complete task');
+        }
+        
+        toast.success("Task completed successfully!", { id: toastId });
+      } catch (error) {
+        console.error("Error completing task:", error);
+        toast.error(error instanceof Error ? error.message : "Failed to complete task", { id: toastId });
+        
+        // Task should remain marked as done in UI even if the server request fails
+        // The optimistic update already did this for us
+      }
     } catch (error) {
-      console.error("Error completing task:", error);
-      toast.error("Failed to complete task. Please try again.");
+      console.error("Complete error details:", error);
+      toast.error("An unexpected error occurred");
     } finally {
       setLoading(false);
     }
@@ -251,6 +336,21 @@ const TaskDetail: React.FC<TaskDetailProps> = ({
     setLoading(true);
     
     try {
+      // Define the update data for UI (using undefined to clear values)
+      const uiUpdateData: Partial<SessionTask> = {
+        status: "todo",
+        assigned_to: undefined,
+        assigned_to_temp_user: undefined,
+        assigned_at: undefined
+      };
+      
+      // Optimistically update the UI first
+      optimisticUpdateTask(sessionTask.id, uiUpdateData);
+      
+      // Close the modal for better responsiveness
+      onClose();
+      
+      // Then make the actual database update (using null for database)
       const { error } = await supabase
         .from("cleaning_session_tasks")
         .update({
@@ -264,10 +364,13 @@ const TaskDetail: React.FC<TaskDetailProps> = ({
       if (error) throw error;
       
       toast.success("Task returned to To Do list");
-      onClose();
     } catch (error) {
       console.error("Error canceling task:", error);
       toast.error("Failed to cancel task. Please try again.");
+      
+      // Revert the optimistic update if there was an error
+      // Note: We don't have the original task data to revert to here, 
+      // but the UI will refresh from the server via realtime subscription
     } finally {
       setLoading(false);
     }

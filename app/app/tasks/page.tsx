@@ -11,7 +11,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { createClient } from "@/utils/supabase/client";
 import { Columns, List, Share2, User } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Confetti from "react-confetti";
 import { toast } from "sonner";
 import { PriorityIcon } from "./components/PriorityIcon";
@@ -104,7 +104,15 @@ export default function TasksPage() {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [currentParticipant, setCurrentParticipant] = useState<SessionParticipant | null>(null);
   const [showConfetti, setShowConfetti] = useState(false);
-  
+  // Add a ref to always have the latest participants
+  const participantsRef = useRef<SessionParticipant[]>(participants);
+  // Add refs for currentUserId and currentParticipant
+  const currentUserIdRef = useRef(currentUserId);
+  const currentParticipantRef = useRef(currentParticipant);
+
+  // Derived state for myTasks
+  const [myTasks, setMyTasks] = useState<SessionTask[]>([]);
+
   // Group tasks by status
   const todoTasks = sessionTasks
     .filter(task => task.status === "todo")
@@ -139,26 +147,13 @@ export default function TasksPage() {
       : a.task.title.localeCompare(b.task.title)
     );
   
-  // Group tasks by assignment to current user
-  const myTasks = sessionTasks.filter(task => {
-    if (isAuthenticated) {
-      return task.assigned_to === currentUserId;
-    } else if (currentParticipant?.temp_user_id) {
-      return task.assigned_to_temp_user === currentParticipant.temp_user_id;
-    }
-    return false;
-  });
-
-  // Check for completion
-  const allTasksComplete = sessionTasks.length > 0 && sessionTasks.every(task => task.status === "done");
-  
   // Show confetti when all tasks are complete
   useEffect(() => {
-    if (allTasksComplete && !showConfetti) {
+    if (sessionTasks.length > 0 && sessionTasks.every(task => task.status === "done") && !showConfetti) {
       setShowConfetti(true);
       setTimeout(() => setShowConfetti(false), 5000);
     }
-  }, [allTasksComplete, showConfetti]);
+  }, [sessionTasks, showConfetti]);
   
   // Check authentication status
   useEffect(() => {
@@ -550,17 +545,29 @@ export default function TasksPage() {
   useEffect(() => {
     if (!session) return;
     
+    console.log("Setting up real-time subscriptions for session:", session.id);
     const currentSessionId = session.id;
     
+    // Force a fresh supabase client for real-time connections
+    const realtimeClient = createClient();
+    
     // Subscribe to task changes
-    const taskSubscription = supabase
-      .channel(`cleaning_session_tasks:${currentSessionId}`)
+    const taskSubscription = realtimeClient
+      .channel(`cleaning_session_tasks:${currentSessionId}`, {
+        config: {
+          broadcast: { self: true }  // Make sure we receive our own updates
+        }
+      })
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
         table: 'cleaning_session_tasks',
         filter: `session_id=eq.${currentSessionId}`
       }, async (payload) => {
+        console.log("Real-time task update received:", payload.eventType, 
+          payload.new && typeof payload.new === 'object' && 'id' in payload.new ? payload.new.id : 'unknown');
+        console.log("Full payload:", JSON.stringify(payload, null, 2));
+        
         // Handle task updates
         if (payload.eventType === 'UPDATE') {
           // For updates, fetch the complete updated task with task details and assignee
@@ -577,13 +584,20 @@ export default function TasksPage() {
             // Find the assignee information
             let assignee = undefined;
             if (data.assigned_to) {
-              const { data: participant } = await supabase
-                .from("session_participants")
-                .select("*")
-                .eq("user_id", data.assigned_to)
-                .eq("session_id", currentSessionId)
-                .maybeSingle();
-                
+              let participant = participantsRef.current.find(p => p.user_id === data.assigned_to);
+              if (!participant) {
+                // Fetch participant if not in current state
+                const { data: fetched } = await supabase
+                  .from("session_participants")
+                  .select("*")
+                  .eq("user_id", data.assigned_to)
+                  .eq("session_id", currentSessionId)
+                  .maybeSingle();
+                participant = fetched;
+                if (participant !== undefined) {
+                  setParticipants(prev => [...prev, participant as SessionParticipant]);
+                }
+              }
               if (participant) {
                 assignee = {
                   display_name: participant.display_name,
@@ -591,13 +605,20 @@ export default function TasksPage() {
                 };
               }
             } else if (data.assigned_to_temp_user) {
-              const { data: participant } = await supabase
-                .from("session_participants")
-                .select("*")
-                .eq("temp_user_id", data.assigned_to_temp_user)
-                .eq("session_id", currentSessionId)
-                .maybeSingle();
-                
+              let participant = participantsRef.current.find(p => p.temp_user_id === data.assigned_to_temp_user);
+              if (!participant) {
+                // Fetch participant if not in current state
+                const { data: fetched } = await supabase
+                  .from("session_participants")
+                  .select("*")
+                  .eq("temp_user_id", data.assigned_to_temp_user)
+                  .eq("session_id", currentSessionId)
+                  .maybeSingle();
+                participant = fetched;
+                if (participant !== undefined) {
+                  setParticipants(prev => [...prev, participant as SessionParticipant]);
+                }
+              }
               if (participant) {
                 assignee = {
                   display_name: participant.display_name,
@@ -605,15 +626,16 @@ export default function TasksPage() {
                 };
               }
             }
-            
             // Update the task with assignee information
             const updatedTask = { ...data, assignee };
-            
-            setSessionTasks(prevTasks => 
-              prevTasks.map(task => 
-                task.id === updatedTask.id ? updatedTask : task
-              )
-            );
+            setSessionTasks(prevTasks => {
+              const exists = prevTasks.some(task => task.id === updatedTask.id);
+              if (exists) {
+                return prevTasks.map(task => task.id === updatedTask.id ? updatedTask : task);
+              } else {
+                return [...prevTasks, updatedTask];
+              }
+            });
           }
         } else if (payload.eventType === 'INSERT') {
           // Fetch the complete task data with task details
@@ -627,7 +649,14 @@ export default function TasksPage() {
             .single();
             
           if (data) {
-            setSessionTasks(prevTasks => [...prevTasks, data]);
+            setSessionTasks(prevTasks => {
+              const exists = prevTasks.some(task => task.id === data.id);
+              if (exists) {
+                return prevTasks.map(task => task.id === data.id ? data : task);
+              } else {
+                return [...prevTasks, data];
+              }
+            });
           }
         } else if (payload.eventType === 'DELETE') {
           setSessionTasks(prevTasks => 
@@ -638,14 +667,21 @@ export default function TasksPage() {
       .subscribe();
       
     // Subscribe to participant changes
-    const participantSubscription = supabase
-      .channel(`session_participants:${currentSessionId}`)
+    const participantSubscription = realtimeClient
+      .channel(`session_participants:${currentSessionId}`, {
+        config: {
+          broadcast: { self: true }  // Make sure we receive our own updates
+        }
+      })
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
         table: 'session_participants',
         filter: `session_id=eq.${currentSessionId}`
       }, (payload) => {
+        console.log("Participant update received:", payload.eventType, 
+          payload.new && typeof payload.new === 'object' && 'id' in payload.new ? payload.new.id : 'unknown');
+        
         if (payload.eventType === 'UPDATE') {
           setParticipants(prevParticipants => 
             prevParticipants.map(participant => 
@@ -663,14 +699,21 @@ export default function TasksPage() {
       .subscribe();
       
     // Subscribe to session changes
-    const sessionSubscription = supabase
-      .channel(`cleaning_sessions:${currentSessionId}`)
+    const sessionSubscription = realtimeClient
+      .channel(`cleaning_sessions:${currentSessionId}`, {
+        config: {
+          broadcast: { self: true }  // Make sure we receive our own updates
+        }
+      })
       .on('postgres_changes', {
         event: 'UPDATE',
         schema: 'public',
         table: 'cleaning_sessions',
         filter: `id=eq.${currentSessionId}`
       }, (payload) => {
+        console.log("Session update received:", payload.eventType,
+          payload.new && typeof payload.new === 'object' && 'id' in payload.new ? payload.new.id : 'unknown');
+        
         setSession(payload.new as CleaningSession);
         
         // Show confetti when session is completed
@@ -682,9 +725,10 @@ export default function TasksPage() {
       .subscribe();
     
     return () => {
-      supabase.removeChannel(taskSubscription);
-      supabase.removeChannel(participantSubscription);
-      supabase.removeChannel(sessionSubscription);
+      console.log("Cleaning up realtime subscriptions");
+      realtimeClient.removeChannel(taskSubscription);
+      realtimeClient.removeChannel(participantSubscription);
+      realtimeClient.removeChannel(sessionSubscription);
     };
   }, [supabase, session]);
   
@@ -727,6 +771,55 @@ export default function TasksPage() {
     setSelectedTask(null);
   }, [supabase, selectedTask, currentParticipant]);
 
+  useEffect(() => {
+    participantsRef.current = participants;
+  }, [participants]);
+
+  useEffect(() => {
+    currentUserIdRef.current = currentUserId;
+  }, [currentUserId]);
+  useEffect(() => {
+    currentParticipantRef.current = currentParticipant;
+  }, [currentParticipant]);
+
+  useEffect(() => {
+    setMyTasks(
+      sessionTasks.filter(task => {
+        if (isAuthenticated && currentUserIdRef.current) {
+          return task.assigned_to === currentUserIdRef.current;
+        } else if (currentParticipantRef.current?.temp_user_id) {
+          return task.assigned_to_temp_user === currentParticipantRef.current.temp_user_id;
+        }
+        return false;
+      })
+    );
+  }, [sessionTasks, isAuthenticated, currentUserId, currentParticipant]);
+
+  // Instead of passing selectedTask directly, always use the latest from sessionTasks
+  const selectedTaskFull = selectedTask
+    ? sessionTasks.find(t => t.id === selectedTask.id) || selectedTask
+    : null;
+
+  // Close modal if selected task is deleted
+  useEffect(() => {
+    if (selectedTask && !sessionTasks.find(t => t.id === selectedTask.id)) {
+      setShowTaskDetail(false);
+      setSelectedTask(null);
+    }
+  }, [sessionTasks, selectedTask]);
+
+  // Optimistically update a task in sessionTasks
+  const optimisticUpdateTask = (taskId: string, updateData: Partial<SessionTask>) => {
+    console.log("Optimistically updating task:", taskId, updateData);
+    setSessionTasks(prevTasks => {
+      const updatedTasks = prevTasks.map(task =>
+        task.id === taskId ? { ...task, ...updateData } : task
+      );
+      console.log("Updated tasks:", updatedTasks.find(t => t.id === taskId));
+      return updatedTasks;
+    });
+  };
+
   if (!session && !loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[70vh]">
@@ -768,10 +861,17 @@ export default function TasksPage() {
   }
   
   return (
-    <>
-      {showConfetti && <Confetti width={window.innerWidth} height={window.innerHeight} recycle={false} />}
+    <div className="flex flex-col h-full min-h-screen">
+      {session?.status === "completed" && showConfetti && (
+        <Confetti
+          width={typeof window !== 'undefined' ? window.innerWidth : 1200}
+          height={typeof window !== 'undefined' ? window.innerHeight : 800}
+          recycle={false}
+          numberOfPieces={500}
+        />
+      )}
       
-      <div className="space-y-6">
+      <main className="flex flex-col flex-grow p-4 md:p-8 space-y-4">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
             <h1 className="text-2xl font-bold">{session?.session_name}</h1>
@@ -800,7 +900,7 @@ export default function TasksPage() {
           </div>
         </div>
         
-        {allTasksComplete && (
+        {(sessionTasks.length > 0 && sessionTasks.every(task => task.status === "done")) && (
           <Card className="bg-green-50 border-green-200">
             <CardContent className="flex flex-col items-center justify-center pt-6 pb-4">
               <div className="rounded-full bg-green-100 p-3 mb-4">
@@ -1013,16 +1113,17 @@ export default function TasksPage() {
             )}
           </div>
         </div>
-      </div>
+      </main>
       
-      {selectedTask && (
+      {selectedTaskFull && (
         <TaskDetail
-          sessionTask={selectedTask}
+          sessionTask={selectedTaskFull}
           isOpen={showTaskDetail}
           onClose={handleTaskDetailClose}
           currentUserId={currentUserId}
           currentParticipant={currentParticipant}
           isAuthenticated={isAuthenticated}
+          optimisticUpdateTask={optimisticUpdateTask}
         />
       )}
       
@@ -1037,6 +1138,6 @@ export default function TasksPage() {
         isOpen={showSignUpPrompt}
         onClose={() => setShowSignUpPrompt(false)}
       />
-    </>
+    </div>
   );
 } 
