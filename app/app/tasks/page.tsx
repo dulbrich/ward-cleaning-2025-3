@@ -361,21 +361,16 @@ export default function TasksPage() {
     if (!session) return;
     
     const joinSession = async () => {
-      // Make joining as a participant non-blocking - user can still view tasks
-      try {
-        // Skip participant creation entirely if debugging is needed
-        // return;
+      const currentSessionId = session.id;
+      // Skip participant creation entirely if debugging is needed
+      // return;
 
-        const currentSessionId = session.id;
-        console.log("Attempting to join session:", currentSessionId);
-        
+      try {
         // First, check if the session_participants table exists and is accessible
         try {
           const { count, error: countError } = await supabase
             .from("session_participants")
             .select("*", { count: "exact", head: true });
-          
-          console.log("Participants table check:", { count, error: countError });
           
           if (countError) {
             console.error("Error checking participants table:", countError);
@@ -389,8 +384,6 @@ export default function TasksPage() {
         
         // For authenticated users
         if (isAuthenticated && currentUserId) {
-          console.log("Joining as authenticated user:", currentUserId);
-          
           try {
             // Simplified approach: Just check if already exists
             const { data: existing } = await supabase
@@ -401,7 +394,6 @@ export default function TasksPage() {
               .maybeSingle();
             
             if (existing) {
-              console.log("User already joined session, updating timestamp");
               // Just update last active time and set participant
               await supabase
                 .from("session_participants")
@@ -410,16 +402,12 @@ export default function TasksPage() {
               
               setCurrentParticipant(existing);
             } else {
-              console.log("Creating new participant entry for authenticated user");
-              
               // Get basic profile info if available
               const { data: profile } = await supabase
                 .from("user_profiles")
                 .select("first_name, last_name, avatar_url, username")
                 .eq("user_id", currentUserId)
                 .maybeSingle();
-              
-              console.log("User profile fetched:", profile ? "Found" : "Not found");
               
               // Create display name from first_name and last_name or use username
               const displayName = profile
@@ -434,8 +422,6 @@ export default function TasksPage() {
                 is_authenticated: true,
                 last_active_at: new Date().toISOString()
               };
-              
-              console.log("New participant data:", JSON.stringify(participantData));
               
               try {
                 const { data: newParticipant, error: insertError } = await supabase
@@ -452,7 +438,6 @@ export default function TasksPage() {
                     message: insertError.message
                   });
                 } else if (newParticipant) {
-                  console.log("Successfully created participant:", newParticipant.id);
                   setCurrentParticipant(newParticipant);
                 }
               } catch (insertErr) {
@@ -467,7 +452,6 @@ export default function TasksPage() {
         } 
         // For anonymous users
         else {
-          console.log("Joining as anonymous user");
           try {
             // Get or create temp user ID
             let tempUserId = localStorage.getItem(`tempUserId_${currentSessionId}`);
@@ -476,8 +460,6 @@ export default function TasksPage() {
               tempUserId = `anon_${Math.random().toString(36).substring(2, 10)}`;
               localStorage.setItem(`tempUserId_${currentSessionId}`, tempUserId);
             }
-            
-            console.log("Using temp user ID:", tempUserId);
             
             // Check if this temp user already joined
             const { data: existing } = await supabase
@@ -488,7 +470,6 @@ export default function TasksPage() {
               .maybeSingle();
             
             if (existing) {
-              console.log("Anonymous user already joined session");
               // Just update timestamp
               await supabase
                 .from("session_participants")
@@ -497,8 +478,6 @@ export default function TasksPage() {
               
               setCurrentParticipant(existing);
             } else {
-              console.log("Creating new anonymous participant");
-              
               // Simple guest name
               const guestNumber = Math.floor(Math.random() * 10000);
               const displayName = `Guest ${guestNumber}`;
@@ -511,8 +490,6 @@ export default function TasksPage() {
                 is_authenticated: false,
                 last_active_at: new Date().toISOString()
               };
-              
-              console.log("New anonymous participant data:", participantData);
               
               const { data: newParticipant, error: insertError } = await supabase
                 .from("session_participants")
@@ -531,7 +508,6 @@ export default function TasksPage() {
               }
               
               if (newParticipant) {
-                console.log("Successfully created anonymous participant:", newParticipant.id);
                 setCurrentParticipant(newParticipant);
               }
             }
@@ -554,7 +530,6 @@ export default function TasksPage() {
   useEffect(() => {
     if (!session) return;
     
-    console.log("Setting up real-time subscriptions for session:", session.id);
     const currentSessionId = session.id;
     
     // Force a fresh supabase client for real-time connections
@@ -578,10 +553,6 @@ export default function TasksPage() {
         old: any; 
         table: string;
       }) => {
-        console.log("Real-time task update received:", payload.eventType, 
-          payload.new && typeof payload.new === 'object' && 'id' in payload.new ? payload.new.id : 'unknown');
-        console.log("Full payload:", JSON.stringify(payload, null, 2));
-        
         // Handle task updates
         if (payload.eventType === 'UPDATE') {
           // For updates, fetch the complete updated task with task details and assignee
@@ -697,9 +668,6 @@ export default function TasksPage() {
         new: any; 
         old: any;
       }) => {
-        console.log("Participant update received:", payload.eventType, 
-          payload.new && typeof payload.new === 'object' && 'id' in payload.new ? payload.new.id : 'unknown');
-        
         if (payload.eventType === 'UPDATE') {
           setParticipants(prevParticipants => 
             prevParticipants.map(participant => 
@@ -733,9 +701,6 @@ export default function TasksPage() {
         new: any;
         old: any;
       }) => {
-        console.log("Session update received:", payload.eventType,
-          payload.new && typeof payload.new === 'object' && 'id' in payload.new ? payload.new.id : 'unknown');
-        
         setSession(payload.new as CleaningSession);
         
         // Show confetti when session is completed
@@ -747,7 +712,6 @@ export default function TasksPage() {
       .subscribe();
     
     return () => {
-      console.log("Cleaning up realtime subscriptions");
       realtimeClient.removeChannel(taskSubscription);
       realtimeClient.removeChannel(participantSubscription);
       realtimeClient.removeChannel(sessionSubscription);
@@ -861,12 +825,10 @@ export default function TasksPage() {
 
   // Optimistically update a task in sessionTasks
   const optimisticUpdateTask = (taskId: string, updateData: Partial<SessionTask>) => {
-    console.log("Optimistically updating task:", taskId, updateData);
     setSessionTasks(prevTasks => {
       const updatedTasks = prevTasks.map(task =>
         task.id === taskId ? { ...task, ...updateData } : task
       );
-      console.log("Updated tasks:", updatedTasks.find(t => t.id === taskId));
       return updatedTasks;
     });
   };
