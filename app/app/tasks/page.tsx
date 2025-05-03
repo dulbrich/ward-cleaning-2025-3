@@ -3,8 +3,8 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
-  Card,
-  CardContent
+    Card,
+    CardContent
 } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -413,44 +413,49 @@ export default function TasksPage() {
               // Get basic profile info if available
               const { data: profile } = await supabase
                 .from("user_profiles")
-                .select("first_name, last_name")
+                .select("first_name, last_name, avatar_url")
                 .eq("user_id", currentUserId)
                 .maybeSingle();
               
+              console.log("User profile fetched:", profile ? "Found" : "Not found");
+              
               const displayName = profile 
-                ? `${profile.first_name} ${profile.last_name}`
-                : "Authenticated User";
-                
-              // Create minimal participant record
+                ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || "User"
+                : "User";
+              
+              // Create participant record - IMPORTANT: avoid nullable/undefined fields
               const participantData = {
                 session_id: currentSessionId,
                 user_id: currentUserId,
                 display_name: displayName,
                 is_authenticated: true,
+                avatar_url: profile && profile.avatar_url ? profile.avatar_url : null,
                 last_active_at: new Date().toISOString()
               };
               
-              console.log("New participant data:", participantData);
+              console.log("New participant data:", JSON.stringify(participantData));
               
-              const { data: newParticipant, error: insertError } = await supabase
-                .from("session_participants")
-                .insert(participantData)
-                .select()
-                .single();
-              
-              if (insertError) {
-                console.error("Error details for creating participant:", {
-                  code: insertError.code,
-                  details: insertError.details,
-                  hint: insertError.hint,
-                  message: insertError.message
-                });
-                throw new Error(`Database error: ${insertError.message || 'Unknown error'}`);
-              }
-              
-              if (newParticipant) {
-                console.log("Successfully created participant:", newParticipant.id);
-                setCurrentParticipant(newParticipant);
+              try {
+                const { data: newParticipant, error: insertError } = await supabase
+                  .from("session_participants")
+                  .insert(participantData)
+                  .select()
+                  .single();
+                
+                if (insertError) {
+                  console.error("Error details for creating participant:", {
+                    code: insertError.code,
+                    details: insertError.details,
+                    hint: insertError.hint,
+                    message: insertError.message
+                  });
+                } else if (newParticipant) {
+                  console.log("Successfully created participant:", newParticipant.id);
+                  setCurrentParticipant(newParticipant);
+                }
+              } catch (insertErr) {
+                console.error("Participant creation error:", insertErr);
+                // Continue - user can still view tasks
               }
             }
           } catch (authUserError) {
