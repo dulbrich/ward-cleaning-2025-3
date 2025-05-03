@@ -75,7 +75,8 @@ interface SessionParticipant {
   display_name: string;
   is_authenticated: boolean;
   last_active_at: string;
-  avatar_url?: string;
+  // Note: avatar_url isn't in the database table, we fetch it separately from user_profiles when needed
+  avatar_url?: string; // This is added dynamically after fetching from the database
 }
 
 interface TaskViewer {
@@ -413,14 +414,15 @@ export default function TasksPage() {
               // Get basic profile info if available
               const { data: profile } = await supabase
                 .from("user_profiles")
-                .select("first_name, last_name, avatar_url")
+                .select("first_name, last_name, avatar_url, username")
                 .eq("user_id", currentUserId)
                 .maybeSingle();
               
               console.log("User profile fetched:", profile ? "Found" : "Not found");
               
-              const displayName = profile 
-                ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || "User"
+              // Create display name from first_name and last_name or use username
+              const displayName = profile
+                ? profile.username || `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || "User"
                 : "User";
               
               // Create participant record - IMPORTANT: avoid nullable/undefined fields
@@ -429,7 +431,6 @@ export default function TasksPage() {
                 user_id: currentUserId,
                 display_name: displayName,
                 is_authenticated: true,
-                avatar_url: profile && profile.avatar_url ? profile.avatar_url : null,
                 last_active_at: new Date().toISOString()
               };
               
@@ -1160,4 +1161,4 @@ export default function TasksPage() {
       />
     </div>
   );
-} 
+}

@@ -106,53 +106,108 @@ const TaskDetail: React.FC<TaskDetailProps> = ({
     }
   }, [sessionTask, currentUserId, currentParticipant, isAuthenticated]);
   
+  // Fetch the assigned user's profile details if needed
+  useEffect(() => {
+    // Only run this for tasks with an authenticated user assignment but missing proper assignee details
+    const needsUserProfileDetails = sessionTask.status !== 'todo' && 
+                                   sessionTask.assigned_to && 
+                                   (!sessionTask.assignee?.avatar_url || !sessionTask.assignee?.display_name);
+                                   
+    if (!needsUserProfileDetails) return;
+    
+    const fetchUserProfile = async () => {
+      try {
+        const { data: userProfile, error } = await supabase
+          .from("user_profiles")
+          .select("first_name, last_name, avatar_url, username")
+          .eq("user_id", sessionTask.assigned_to)
+          .single();
+          
+        if (error) {
+          console.error("Error fetching user profile:", error);
+          return;
+        }
+          
+        if (userProfile) {
+          // Construct display name from first_name and last_name or use username
+          const displayName = userProfile.username || 
+                             `${userProfile.first_name || ''} ${userProfile.last_name || ''}`.trim() || 
+                             "User";
+                             
+          // Update the task with the user profile information
+          optimisticUpdateTask(sessionTask.id, {
+            assignee: {
+              display_name: displayName,
+              avatar_url: userProfile.avatar_url
+            }
+          });
+        }
+      } catch (error) {
+        console.error("Error fetching user profile for assigned task:", error);
+      }
+    };
+    
+    fetchUserProfile();
+  }, [sessionTask, supabase, optimisticUpdateTask]);
+  
   // Fetch viewers of this task
   useEffect(() => {
     if (!isOpen || !sessionTask) return;
     
+    let isMounted = true;
+    
     const fetchTaskViewers = async () => {
-      // Get the updated participant info
-      const { data: participants, error: participantsError } = await supabase
-        .from("session_participants")
-        .select("*")
-        .in("id", currentParticipant ? [currentParticipant.id] : []);
-        
-      if (participantsError) {
-        console.error("Error fetching updated participants:", participantsError);
-      }
-      
-      // First, try to directly get the current user's avatar from user_profiles
-      let currentUserAvatar = '';
-      if (isAuthenticated && currentUserId) {
-        const { data: userProfile } = await supabase
-          .from("user_profiles")
-          .select("avatar_url")
-          .eq("user_id", currentUserId)
-          .single();
+      try {
+        // Get the updated participant info
+        const { data: participants, error: participantsError } = await supabase
+          .from("session_participants")
+          .select("*")
+          .in("id", currentParticipant ? [currentParticipant.id] : []);
           
-        if (userProfile?.avatar_url) {
-          currentUserAvatar = userProfile.avatar_url;
+        if (participantsError) {
+          console.error("Error fetching updated participants:", participantsError);
         }
-      }
-      
-      // Now fetch task viewers
-      const { data, error } = await supabase
-        .from("task_viewers")
-        .select(`
-          *,
-          participant:session_participants(*)
-        `)
-        .eq("session_task_id", sessionTask.id);
         
-      if (error) {
-        console.error("Error fetching task viewers:", error);
-      } else {
-        // Process viewers and inject current user's avatar if applicable
-        const processedData = data?.map((viewer: any) => {
+        // First, try to directly get the current user's avatar from user_profiles
+        let currentUserAvatar = '';
+        if (isAuthenticated && currentUserId) {
+          try {
+            const { data: userProfile } = await supabase
+              .from("user_profiles")
+              .select("avatar_url")
+              .eq("user_id", currentUserId)
+              .single();
+              
+            if (userProfile?.avatar_url) {
+              currentUserAvatar = userProfile.avatar_url;
+            }
+          } catch (error) {
+            console.error("Error fetching user profile:", error);
+          }
+        }
+        
+        // Now fetch task viewers
+        const { data, error } = await supabase
+          .from("task_viewers")
+          .select(`
+            *,
+            participant:session_participants(*)
+          `)
+          .eq("session_task_id", sessionTask.id);
+          
+        if (error) {
+          console.error("Error fetching task viewers:", error);
+          return;
+        }
+        
+        if (!isMounted) return;
+        
+        // Process viewers synchronously first to avoid React errors
+        const initialViewers = data?.map((viewer: any) => {
           const participantData = viewer.participant || {};
           const isCurrentUser = (isAuthenticated && currentUserId && participantData.user_id === currentUserId) ||
-                               (!isAuthenticated && currentParticipant && participantData.id === currentParticipant.id);
-           
+                              (!isAuthenticated && currentParticipant && participantData.id === currentParticipant.id);
+          
           // Use directly fetched avatar for current user
           if (isCurrentUser && currentUserAvatar) {
             return {
@@ -164,16 +219,61 @@ const TaskDetail: React.FC<TaskDetailProps> = ({
             };
           }
           
+          // Return data without avatar for now (we'll load them later)
           return {
             ...viewer,
             participant: {
               ...participantData,
-              avatar_url: participantData.avatar_url || null
+              avatar_url: participantData.avatar_url || undefined
             }
           };
         }) || [];
         
-        setTaskViewers(processedData);
+        // Set initial data so UI renders immediately
+        if (isMounted) {
+          setTaskViewers(initialViewers);
+        }
+        
+        // Then, update avatars one by one
+        if (data && isMounted) {
+          for (const viewer of data) {
+            const participantData = viewer.participant || {};
+            
+            // Skip current user (already handled) and non-authenticated users
+            if (participantData.user_id && 
+                participantData.is_authenticated && 
+                participantData.user_id !== currentUserId) {
+              try {
+                const { data: profile } = await supabase
+                  .from("user_profiles")
+                  .select("avatar_url")
+                  .eq("user_id", participantData.user_id)
+                  .single();
+                  
+                if (profile?.avatar_url && isMounted) {
+                  // Update this specific viewer with avatar
+                  setTaskViewers(prev => 
+                    prev.map(v => 
+                      v.id === viewer.id 
+                        ? {
+                            ...v,
+                            participant: {
+                              ...v.participant,
+                              avatar_url: profile.avatar_url
+                            }
+                          } 
+                        : v
+                    )
+                  );
+                }
+              } catch (error) {
+                // Silently fail, avatar will stay null
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.error("Error in fetchTaskViewers:", error);
       }
     };
     
@@ -188,7 +288,7 @@ const TaskDetail: React.FC<TaskDetailProps> = ({
         table: 'task_viewers',
         filter: `session_task_id=eq.${sessionTask.id}`
       }, (payload: any) => {
-        console.log("TaskDetail real-time update received:", payload.eventType);
+        if (!isMounted) return;
         
         if (payload.eventType === 'INSERT') {
           // Fetch the complete viewer data with participant details
@@ -201,17 +301,51 @@ const TaskDetail: React.FC<TaskDetailProps> = ({
             .eq("id", payload.new.id)
             .single()
             .then(({ data }: { data: TaskViewer | null }) => {
-              if (data) {
-                // Process the avatar URL before adding to state
-                const processedData = {
-                  ...data,
-                  participant: {
-                    ...data.participant,
-                    avatar_url: data.participant?.avatar_url || undefined
-                  }
-                };
-                setTaskViewers(prev => [...prev, processedData]);
+              if (!data || !isMounted) return;
+              
+              // Add without avatar first
+              const initialData = {
+                ...data,
+                participant: {
+                  ...data.participant,
+                  avatar_url: data.participant?.avatar_url || undefined
+                }
+              };
+              
+              setTaskViewers(prev => [...prev, initialData]);
+              
+              // Then fetch avatar if needed
+              if (data.participant?.user_id && data.participant?.is_authenticated) {
+                supabase
+                  .from("user_profiles")
+                  .select("avatar_url")
+                  .eq("user_id", data.participant.user_id)
+                  .single()
+                  .then(({ data: profile }: { data: { avatar_url?: string } | null }) => {
+                    if (!isMounted || !profile?.avatar_url) return;
+                    
+                    // Update with avatar
+                    setTaskViewers(prev => 
+                      prev.map(v => 
+                        v.id === initialData.id 
+                          ? {
+                              ...v,
+                              participant: {
+                                ...v.participant,
+                                avatar_url: profile.avatar_url
+                              }
+                            } 
+                          : v
+                      )
+                    );
+                  })
+                  .catch((error: Error) => {
+                    console.error("Error fetching new task viewer:", error);
+                  });
               }
+            })
+            .catch((error: Error) => {
+              console.error("Error fetching new task viewer:", error);
             });
         } else if (payload.eventType === 'DELETE') {
           setTaskViewers(prev => 
@@ -222,6 +356,7 @@ const TaskDetail: React.FC<TaskDetailProps> = ({
       .subscribe();
       
     return () => {
+      isMounted = false;
       supabase.removeChannel(taskViewersSubscription);
     };
   }, [supabase, sessionTask, isOpen, currentParticipant, currentUserId, isAuthenticated]);
@@ -243,33 +378,49 @@ const TaskDetail: React.FC<TaskDetailProps> = ({
       
       let assignToUserId = null;
       let assignToTempUserId = null;
+      let displayName = currentParticipant?.display_name || "User";
+      let avatarUrl: string | undefined = undefined;
       
       // Add the appropriate assignment field
       if (isAuthenticated && currentUserId) {
         uiUpdateData.assigned_to = currentUserId;
         assignToUserId = currentUserId;
         
-        // Add assignee info for UI
-        if (currentParticipant) {
-          uiUpdateData.assignee = {
-            display_name: currentParticipant.display_name,
-            avatar_url: currentParticipant.avatar_url
-          };
+        // Get user profile data for better display
+        try {
+          const { data: userProfile, error: profileError } = await supabase
+            .from("user_profiles")
+            .select("first_name, last_name, avatar_url, username")
+            .eq("user_id", currentUserId)
+            .single();
+          
+          if (!profileError && userProfile) {
+            // Use username or fallback to display name
+            displayName = userProfile.username || 
+                        `${userProfile.first_name || ''} ${userProfile.last_name || ''}`.trim() || 
+                        displayName;
+            
+            // Use avatar URL if available
+            avatarUrl = userProfile.avatar_url;
+          }
+        } catch (error) {
+          console.error("Error fetching user profile:", error);
         }
       } else if (currentParticipant?.temp_user_id) {
         uiUpdateData.assigned_to_temp_user = currentParticipant.temp_user_id;
         assignToTempUserId = currentParticipant.temp_user_id;
-        
-        // Add assignee info for UI
-        uiUpdateData.assignee = {
-          display_name: currentParticipant.display_name,
-          avatar_url: currentParticipant.avatar_url
-        };
+        displayName = currentParticipant.display_name;
       } else {
         toast.error("You need to be logged in to claim a task.");
         setLoading(false);
         return;
       }
+      
+      // Add assignee info with fetched data
+      uiUpdateData.assignee = {
+        display_name: displayName,
+        avatar_url: avatarUrl
+      };
       
       // Optimistically update the UI
       optimisticUpdateTask(sessionTask.id, uiUpdateData);
@@ -345,11 +496,41 @@ const TaskDetail: React.FC<TaskDetailProps> = ({
       // Show loading toast
       const toastId = toast.loading("Completing task...");
       
+      // Ensure we have user info for the completion record
+      let assigneeInfo = sessionTask.assignee;
+      
+      // If no assignee info and task is assigned to current user, try to fetch it
+      if ((!assigneeInfo?.avatar_url || !assigneeInfo?.display_name) && 
+          isAuthenticated && currentUserId === sessionTask.assigned_to) {
+        try {
+          const { data: userProfile, error } = await supabase
+            .from("user_profiles")
+            .select("avatar_url, username, first_name, last_name")
+            .eq("user_id", currentUserId)
+            .single();
+            
+          if (!error && userProfile) {
+            const displayName = userProfile.username || 
+                             `${userProfile.first_name || ''} ${userProfile.last_name || ''}`.trim() || 
+                             "User";
+                             
+            assigneeInfo = {
+              display_name: displayName,
+              avatar_url: userProfile.avatar_url
+            };
+          }
+        } catch (profileError) {
+          console.error("Error fetching user profile for task completion:", profileError);
+          // Continue with existing assignee info or fallback
+        }
+      }
+      
       try {
         // Optimistically update the UI first for better responsiveness
         optimisticUpdateTask(sessionTask.id, {
           status: "done" as const,
-          completed_at: new Date().toISOString()
+          completed_at: new Date().toISOString(),
+          assignee: assigneeInfo
         });
         
         // Use the server-side API endpoint that bypasses triggers
@@ -373,9 +554,6 @@ const TaskDetail: React.FC<TaskDetailProps> = ({
       } catch (error) {
         console.error("Error completing task:", error);
         toast.error(error instanceof Error ? error.message : "Failed to complete task", { id: toastId });
-        
-        // Task should remain marked as done in UI even if the server request fails
-        // The optimistic update already did this for us
       }
     } catch (error) {
       console.error("Complete error details:", error);
@@ -445,9 +623,19 @@ const TaskDetail: React.FC<TaskDetailProps> = ({
   };
   
   // Helper function to get the proper avatar URL
-  const getAvatarUrl = (avatarPath?: string) => {
+  const getAvatarUrl = (avatarPath?: string): string => {
     if (!avatarPath) return '';
-    return avatarPath.startsWith('/') ? avatarPath : `/images/avatars/${avatarPath}`;
+    
+    if (avatarPath.startsWith('http')) {
+      // Already a complete URL
+      return avatarPath;
+    } else if (avatarPath.startsWith('/')) {
+      // A site-relative path
+      return avatarPath;
+    } else {
+      // Assume it's a relative path to avatars
+      return `/images/avatars/${avatarPath}`;
+    }
   };
   
   return (
@@ -544,16 +732,13 @@ const TaskDetail: React.FC<TaskDetailProps> = ({
             <div className="flex items-center gap-2">
               <span className="text-sm font-medium">Assigned to:</span>
               <div className="flex items-center gap-2">
-                <Avatar className="h-6 w-6">
+                <Avatar className="h-8 w-8">
                   {sessionTask.assignee?.avatar_url && (
                     <AvatarImage 
                       src={getAvatarUrl(sessionTask.assignee.avatar_url)} 
                       alt={sessionTask.assignee.display_name || "User"}
                       className="object-cover"
                       onError={(e) => {
-                        // Safe access with optional chaining
-                        const avatarUrl = sessionTask.assignee?.avatar_url || "unknown";
-                        console.error("Assignee avatar failed to load:", avatarUrl);
                         const target = e.target as HTMLImageElement;
                         target.style.display = 'none';
                       }}
@@ -563,7 +748,7 @@ const TaskDetail: React.FC<TaskDetailProps> = ({
                     {(sessionTask.assignee.display_name || "User").substring(0, 2).toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
-                <span className="text-sm">{sessionTask.assignee.display_name}</span>
+                <span className="text-sm font-medium">{sessionTask.assignee.display_name}</span>
               </div>
             </div>
           )}
