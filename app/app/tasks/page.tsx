@@ -9,7 +9,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { createClient } from "@/utils/supabase/client";
-import { Columns, List, Share2, User } from "lucide-react";
+import { Columns, List, Share2, User, Users } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import Confetti from "react-confetti";
@@ -107,6 +107,7 @@ export default function TasksPage() {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [currentParticipant, setCurrentParticipant] = useState<SessionParticipant | null>(null);
   const [showConfetti, setShowConfetti] = useState(false);
+  const [cleaningUp, setCleaningUp] = useState(false);
   // Add a ref to always have the latest participants
   const participantsRef = useRef<SessionParticipant[]>(participants);
   // Add refs for currentUserId and currentParticipant
@@ -760,17 +761,46 @@ export default function TasksPage() {
     
     // Record that user is viewing this task
     if (currentParticipant) {
+      // First check if we need to update the participant's display_name to use username
+      if (isAuthenticated && currentUserId) {
+        // Fetch the user's username to ensure consistent naming
+        supabase
+          .from("user_profiles")
+          .select("username")
+          .eq("user_id", currentUserId)
+          .single()
+          .then(({ data }: { data: { username?: string } | null }) => {
+            // Only proceed if we found a username
+            if (data?.username) {
+              // If the participant's display_name doesn't match the username, update it
+              if (currentParticipant.display_name !== data.username) {
+                supabase
+                  .from("session_participants")
+                  .update({ display_name: data.username })
+                  .eq("id", currentParticipant.id)
+                  .then(() => {
+                    // Don't need to do anything special here
+                  });
+              }
+            }
+          });
+      }
+    
       supabase
         .from("task_viewers")
         .upsert({
           session_task_id: task.id,
-          participant_id: currentParticipant.id
+          participant_id: currentParticipant.id,
+          started_viewing_at: new Date().toISOString()
+        }, {
+          onConflict: 'session_task_id,participant_id',
+          ignoreDuplicates: false // Update the timestamp if record exists
         })
         .then(({ error }: { error: any }) => {
           if (error) console.error("Error recording task view:", error);
         });
     }
-  }, [supabase, currentParticipant]);
+  }, [supabase, currentParticipant, isAuthenticated, currentUserId]);
   
   // Handle task detail close
   const handleTaskDetailClose = useCallback(() => {
@@ -840,6 +870,48 @@ export default function TasksPage() {
       return updatedTasks;
     });
   };
+
+  // Clean up duplicate task viewers
+  const cleanupDuplicateViewers = useCallback(async () => {
+    try {
+      setCleaningUp(true);
+      const response = await fetch('/api/realtime-status?fix_duplicates=true');
+      const result = await response.json();
+      
+      if (result.duplicateCleanupResult && result.duplicateCleanupResult.success) {
+        const removed = result.duplicateCleanupResult.totalDuplicatesRemoved;
+        if (removed > 0) {
+          toast.success(`Cleaned up ${removed} duplicate viewer records`);
+        } else {
+          toast.info("No duplicate viewers found");
+        }
+      } else {
+        toast.error("Failed to clean up duplicate viewers");
+        console.error("Cleanup error:", result.duplicateCleanupResult?.error);
+      }
+    } catch (error) {
+      console.error("Error cleaning up duplicate viewers:", error);
+      toast.error("An error occurred while cleaning up viewers");
+    } finally {
+      setCleaningUp(false);
+    }
+  }, []);
+
+  // Clear all task viewers when unmounting
+  useEffect(() => {
+    return () => {
+      // Clean up any task viewers when component unmounts
+      if (currentParticipant) {
+        supabase
+          .from("task_viewers")
+          .delete()
+          .eq("participant_id", currentParticipant.id)
+          .then(({ error }: { error: any }) => {
+            if (error) console.error("Error cleaning up task viewers on unmount:", error);
+          });
+      }
+    };
+  }, [supabase, currentParticipant]);
 
   if (!session && !loading) {
     return (
@@ -918,6 +990,18 @@ export default function TasksPage() {
             <Button variant="outline" size="icon" onClick={() => setShowShareDialog(true)}>
               <Share2 size={16} />
             </Button>
+            
+            {isAuthenticated && (
+              <Button 
+                variant="outline" 
+                size="icon" 
+                onClick={cleanupDuplicateViewers} 
+                disabled={cleaningUp}
+                title="Clean up duplicate viewers"
+              >
+                <Users size={16} />
+              </Button>
+            )}
           </div>
         </div>
         

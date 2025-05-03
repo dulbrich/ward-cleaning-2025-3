@@ -41,8 +41,21 @@ export const AvatarGroup: React.FC<AvatarGroupProps> = ({
 }) => {
   // Track which avatars failed to load
   const [failedImages, setFailedImages] = useState<Record<number, boolean>>({});
-  const visibleViewers = viewers.slice(0, limit);
-  const hiddenCount = Math.max(0, viewers.length - limit);
+  
+  // Deduplicate viewers by name, using normalized names for comparison
+  const uniqueViewers = viewers.reduce((acc: Viewer[], viewer) => {
+    // Normalize name for comparison (lowercase, trim)
+    const normalizedName = viewer.name.toLowerCase().trim();
+    
+    // Skip if we already have a viewer with this name (normalized comparison)
+    if (!acc.some(v => v.name.toLowerCase().trim() === normalizedName)) {
+      acc.push(viewer);
+    }
+    return acc;
+  }, []);
+  
+  const visibleViewers = uniqueViewers.slice(0, limit);
+  const hiddenCount = Math.max(0, uniqueViewers.length - limit);
   
   // Handle image loading error in the component
   const handleImageError = (index: number) => {
@@ -90,7 +103,7 @@ export const AvatarGroup: React.FC<AvatarGroupProps> = ({
               </div>
             </TooltipTrigger>
             <TooltipContent>
-              {viewers.slice(limit).map(viewer => viewer.name).join(", ")}
+              {uniqueViewers.slice(limit).map(viewer => viewer.name).join(", ")}
             </TooltipContent>
           </Tooltip>
         )}

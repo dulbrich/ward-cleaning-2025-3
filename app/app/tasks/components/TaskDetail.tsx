@@ -203,72 +203,107 @@ const TaskDetail: React.FC<TaskDetailProps> = ({
         if (!isMounted) return;
         
         // Process viewers synchronously first to avoid React errors
-        const initialViewers = data?.map((viewer: any) => {
+        // Deduplicate viewers by participant_id to prevent multiple instances of the same user
+        const viewersByParticipant = new Map();
+        
+        // First pass: collect viewers by user_id if authenticated, otherwise by temp_user_id or participant_id
+        data?.forEach((viewer: any) => {
           const participantData = viewer.participant || {};
-          const isCurrentUser = (isAuthenticated && currentUserId && participantData.user_id === currentUserId) ||
-                              (!isAuthenticated && currentParticipant && participantData.id === currentParticipant.id);
           
-          // Use directly fetched avatar for current user
-          if (isCurrentUser && currentUserAvatar) {
-            return {
-              ...viewer,
-              participant: {
-                ...participantData,
-                avatar_url: currentUserAvatar
-              }
-            };
+          // Create a unique identifier based on user identity rather than participant ID
+          // This ensures that multiple entries from the same user (but different participant records) are consolidated
+          let uniqueId: string;
+          
+          if (participantData.user_id) {
+            // For authenticated users, use their user_id as the key
+            uniqueId = `user_${participantData.user_id}`;
+          } else if (participantData.temp_user_id) {
+            // For anonymous users, use their temp_user_id
+            uniqueId = `temp_${participantData.temp_user_id}`;
+          } else {
+            // Fallback to participant_id if neither is available
+            uniqueId = `participant_${participantData.id}`;
           }
           
-          // Return data without avatar for now (we'll load them later)
-          return {
-            ...viewer,
-            participant: {
-              ...participantData,
-              avatar_url: participantData.avatar_url || undefined
+          // Skip if we already have this user (keeping only the first/latest entry)
+          if (!viewersByParticipant.has(uniqueId)) {
+            const isCurrentUser = (isAuthenticated && currentUserId && participantData.user_id === currentUserId) ||
+                                (!isAuthenticated && currentParticipant && participantData.id === currentParticipant.id);
+            
+            // For current user: Use the directly fetched avatar 
+            if (isCurrentUser && currentUserAvatar) {
+              viewersByParticipant.set(uniqueId, {
+                ...viewer,
+                participant: {
+                  ...participantData,
+                  avatar_url: currentUserAvatar
+                }
+              });
+            } else {
+              // For other users, use data without avatar for now (we'll load them later)
+              viewersByParticipant.set(uniqueId, {
+                ...viewer,
+                participant: {
+                  ...participantData,
+                  avatar_url: participantData.avatar_url || undefined
+                }
+              });
             }
-          };
-        }) || [];
+          }
+        });
         
-        // Set initial data so UI renders immediately
+        // Set initial data so UI renders immediately with deduplicated viewers
         if (isMounted) {
-          setTaskViewers(initialViewers);
+          setTaskViewers(Array.from(viewersByParticipant.values()));
         }
         
-        // Then, update avatars one by one
+        // Then, update avatars one by one for authenticated users
         if (data && isMounted) {
+          // Create a map to track which users we've already processed for avatars
+          const processedUsers = new Set();
+          
           for (const viewer of data) {
             const participantData = viewer.participant || {};
             
-            // Skip current user (already handled) and non-authenticated users
-            if (participantData.user_id && 
-                participantData.is_authenticated && 
-                participantData.user_id !== currentUserId) {
-              try {
-                const { data: profile } = await supabase
-                  .from("user_profiles")
-                  .select("avatar_url")
-                  .eq("user_id", participantData.user_id)
-                  .single();
-                  
-                if (profile?.avatar_url && isMounted) {
-                  // Update this specific viewer with avatar
-                  setTaskViewers(prev => 
-                    prev.map(v => 
-                      v.id === viewer.id 
-                        ? {
-                            ...v,
-                            participant: {
-                              ...v.participant,
-                              avatar_url: profile.avatar_url
-                            }
-                          } 
-                        : v
-                    )
-                  );
-                }
-              } catch (error) {
-                // Silently fail, avatar will stay null
+            // Skip if no user_id (anonymous users) or not authenticated
+            if (!participantData.user_id || !participantData.is_authenticated) {
+              continue;
+            }
+            
+            // Skip users we've already processed
+            if (processedUsers.has(participantData.user_id)) continue;
+            processedUsers.add(participantData.user_id);
+            
+            // Skip current user (already handled)
+            if (participantData.user_id === currentUserId) continue;
+            
+            try {
+              const { data: profile } = await supabase
+                .from("user_profiles")
+                .select("avatar_url, username")
+                .eq("user_id", participantData.user_id)
+                .single();
+                
+              if (profile?.avatar_url && isMounted) {
+                // Update this specific viewer with avatar, matching by user_id
+                setTaskViewers(prev => 
+                  prev.map(v => 
+                    v.participant?.user_id === participantData.user_id 
+                      ? {
+                          ...v,
+                          participant: {
+                            ...v.participant,
+                            avatar_url: profile.avatar_url,
+                            // Ensure we use username consistently to solve the hover issue
+                            display_name: profile.username || v.participant?.display_name
+                          }
+                        } 
+                      : v
+                  )
+                );
               }
+            } catch (error) {
+              // Silently fail, avatar will stay null
             }
           }
         }
@@ -312,27 +347,58 @@ const TaskDetail: React.FC<TaskDetailProps> = ({
                 }
               };
               
-              setTaskViewers(prev => [...prev, initialData]);
+              // Check if this user is already in the list to avoid duplicates
+              setTaskViewers(prev => {
+                // For consistent deduplication, match on user_id or temp_user_id instead of participant_id
+                const participantData = data.participant;
+                if (!participantData) return [...prev, initialData];
+                
+                const existingIndex = prev.findIndex(viewer => {
+                  const vParticipant = viewer.participant;
+                  if (!vParticipant) return false;
+                  
+                  // Match authenticated users by user_id
+                  if (participantData.user_id && vParticipant.user_id) {
+                    return participantData.user_id === vParticipant.user_id;
+                  }
+                  
+                  // Match anonymous users by temp_user_id
+                  if (participantData.temp_user_id && vParticipant.temp_user_id) {
+                    return participantData.temp_user_id === vParticipant.temp_user_id;
+                  }
+                  
+                  // Fallback to participant_id
+                  return participantData.id === vParticipant.id;
+                });
+                
+                // This user is already in the list - don't add it
+                if (existingIndex >= 0) return prev;
+                
+                // New user - add it
+                return [...prev, initialData];
+              });
               
-              // Then fetch avatar if needed
+              // Then fetch avatar and username if needed
               if (data.participant?.user_id && data.participant?.is_authenticated) {
                 supabase
                   .from("user_profiles")
-                  .select("avatar_url")
+                  .select("avatar_url, username")
                   .eq("user_id", data.participant.user_id)
                   .single()
-                  .then(({ data: profile }: { data: { avatar_url?: string } | null }) => {
+                  .then(({ data: profile }: { data: { avatar_url?: string, username?: string } | null }) => {
                     if (!isMounted || !profile?.avatar_url) return;
                     
-                    // Update with avatar
+                    // Update with avatar and consistent username
                     setTaskViewers(prev => 
                       prev.map(v => 
-                        v.id === initialData.id 
+                        v.participant?.user_id === initialData.participant?.user_id 
                           ? {
                               ...v,
                               participant: {
                                 ...v.participant,
-                                avatar_url: profile.avatar_url
+                                avatar_url: profile.avatar_url,
+                                // Ensure we use username consistently
+                                display_name: profile.username || v.participant?.display_name
                               }
                             } 
                           : v
