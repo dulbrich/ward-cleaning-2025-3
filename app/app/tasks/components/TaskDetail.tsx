@@ -111,8 +111,6 @@ const TaskDetail: React.FC<TaskDetailProps> = ({
     if (!isOpen || !sessionTask) return;
     
     const fetchTaskViewers = async () => {
-      console.log("Fetching task viewers for task:", sessionTask.id);
-      
       // Get the updated participant info
       const { data: participants, error: participantsError } = await supabase
         .from("session_participants")
@@ -121,8 +119,6 @@ const TaskDetail: React.FC<TaskDetailProps> = ({
         
       if (participantsError) {
         console.error("Error fetching updated participants:", participantsError);
-      } else if (participants && participants.length > 0) {
-        console.log("Current participant details:", participants[0]);
       }
       
       // First, try to directly get the current user's avatar from user_profiles
@@ -136,7 +132,6 @@ const TaskDetail: React.FC<TaskDetailProps> = ({
           
         if (userProfile?.avatar_url) {
           currentUserAvatar = userProfile.avatar_url;
-          console.log("Found user avatar directly from profile:", currentUserAvatar);
         }
       }
       
@@ -152,8 +147,6 @@ const TaskDetail: React.FC<TaskDetailProps> = ({
       if (error) {
         console.error("Error fetching task viewers:", error);
       } else {
-        console.log("Raw task viewers data:", data);
-        
         // Process viewers and inject current user's avatar if applicable
         const processedData = data?.map((viewer: any) => {
           const participantData = viewer.participant || {};
@@ -162,7 +155,6 @@ const TaskDetail: React.FC<TaskDetailProps> = ({
            
           // Use directly fetched avatar for current user
           if (isCurrentUser && currentUserAvatar) {
-            console.log("Using directly fetched avatar for current user:", currentUserAvatar);
             return {
               ...viewer,
               participant: {
@@ -181,7 +173,6 @@ const TaskDetail: React.FC<TaskDetailProps> = ({
           };
         }) || [];
         
-        console.log("Processed viewers with direct avatar lookup:", processedData);
         setTaskViewers(processedData);
       }
     };
@@ -280,8 +271,6 @@ const TaskDetail: React.FC<TaskDetailProps> = ({
         return;
       }
       
-      console.log("Task assignment data:", JSON.stringify(uiUpdateData));
-      
       // Optimistically update the UI
       optimisticUpdateTask(sessionTask.id, uiUpdateData);
       
@@ -313,7 +302,6 @@ const TaskDetail: React.FC<TaskDetailProps> = ({
           throw new Error(result.error || "Failed to assign task");
         }
       } else {
-        console.log("Task assignment successful:", result);
         toast.success("Task assigned to you!");
         
         // Apply the server response data if it includes the task
@@ -376,7 +364,6 @@ const TaskDetail: React.FC<TaskDetailProps> = ({
         });
         
         const result = await response.json();
-        console.log("API response:", result);
         
         if (!response.ok) {
           throw new Error(result.error || 'Failed to complete task');
@@ -484,7 +471,6 @@ const TaskDetail: React.FC<TaskDetailProps> = ({
               viewers={taskViewers.map(viewer => {
                 const name = viewer.participant?.display_name || 'User';
                 const avatarPath = viewer.participant?.avatar_url;
-                console.log(`Mapping viewer with name: ${name}, avatar: ${avatarPath || "none"}`);
                 return {
                   name: name,
                   imageSrc: avatarPath || ''
