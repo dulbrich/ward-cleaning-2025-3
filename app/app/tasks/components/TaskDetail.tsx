@@ -22,6 +22,7 @@ function createMarkup(html: string) {
   return { __html: html };
 }
 
+// ward task interface
 interface WardTask {
   id: string;
   title: string;
