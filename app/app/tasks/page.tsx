@@ -9,7 +9,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { createClient } from "@/utils/supabase/client";
-import { Columns, List, Share2, User, Users } from "lucide-react";
+import { Columns, List, Share2, Star, User, Users } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import Confetti from "react-confetti";
@@ -1084,9 +1084,35 @@ export default function TasksPage() {
                       <div className="text-sm text-muted-foreground">{task.task.subtitle}</div>
                     </div>
                     <div className="flex items-center gap-2">
+                      {/* Points Badge */}
+                      {task.task.points && (
+                        <Badge variant="outline" className="flex items-center gap-1 bg-amber-50 text-amber-700 border-amber-200">
+                          <Star className="h-3 w-3" />
+                          {task.task.points} points
+                        </Badge>
+                      )}
+
+                      {/* Kid-friendly badge - only show if true */}
+                      {task.task.kid_friendly && (
+                        <Badge 
+                          variant="outline" 
+                          className="hidden sm:flex items-center gap-1 bg-pink-50 text-pink-600 border-pink-200"
+                        >
+                          Kid Friendly
+                        </Badge>
+                      )}
+                      
+                      {/* Priority Badge with text */}
                       {task.task.priority && (
-                        <Badge variant="outline" className="flex items-center gap-1">
+                        <Badge 
+                          variant={task.task.priority === 'do_first' ? 'destructive' : 'outline'}
+                          className="flex items-center gap-1"
+                        >
                           <PriorityIcon priority={task.task.priority} className="h-3 w-3" />
+                          <span className="hidden sm:inline">
+                            {task.task.priority === 'do_first' ? 'Do First' : 
+                             task.task.priority === 'do_last' ? 'Do Last' : ''}
+                          </span>
                         </Badge>
                       )}
                       <Badge>To Do</Badge>
@@ -1115,9 +1141,35 @@ export default function TasksPage() {
                       <div className="text-sm text-muted-foreground">{task.task.subtitle}</div>
                     </div>
                     <div className="flex items-center gap-2">
+                      {/* Points Badge */}
+                      {task.task.points && (
+                        <Badge variant="outline" className="flex items-center gap-1 bg-amber-50 text-amber-700 border-amber-200">
+                          <Star className="h-3 w-3" />
+                          {task.task.points} points
+                        </Badge>
+                      )}
+                      
+                      {/* Kid-friendly badge - only show if true */}
+                      {task.task.kid_friendly && (
+                        <Badge 
+                          variant="outline" 
+                          className="hidden sm:flex items-center gap-1 bg-pink-50 text-pink-600 border-pink-200"
+                        >
+                          Kid Friendly
+                        </Badge>
+                      )}
+                      
+                      {/* Priority Badge with text */}
                       {task.task.priority && (
-                        <Badge variant="outline" className="flex items-center gap-1">
+                        <Badge 
+                          variant={task.task.priority === 'do_first' ? 'destructive' : 'outline'} 
+                          className="flex items-center gap-1"
+                        >
                           <PriorityIcon priority={task.task.priority} className="h-3 w-3" />
+                          <span className="hidden sm:inline">
+                            {task.task.priority === 'do_first' ? 'Do First' : 
+                             task.task.priority === 'do_last' ? 'Do Last' : ''}
+                          </span>
                         </Badge>
                       )}
                       <Badge>In Progress</Badge>
@@ -1148,6 +1200,30 @@ export default function TasksPage() {
                       <div className="text-sm text-muted-foreground">{task.task.subtitle}</div>
                     </div>
                     <div className="flex items-center gap-2">
+                      {/* Points Badge */}
+                      {task.task.points && (
+                        <Badge variant="outline" className="flex items-center gap-1 bg-amber-50 text-amber-700 border-amber-200">
+                          <Star className="h-3 w-3" />
+                          {task.task.points} points
+                        </Badge>
+                      )}
+                      
+                      {/* Kid-friendly badge - only show if true */}
+                      {task.task.kid_friendly && (
+                        <Badge 
+                          variant="outline" 
+                          className="hidden sm:flex items-center gap-1 bg-pink-50 text-pink-600 border-pink-200"
+                        >
+                          Kid Friendly
+                        </Badge>
+                      )}
+                      
+                      {/* Show assigned to if available */}
+                      {task.assignee && (
+                        <Badge variant="outline" className="hidden sm:flex items-center gap-1">
+                          {task.assignee.display_name}
+                        </Badge>
+                      )}
                       <Badge>Completed</Badge>
                       {task.completed_at && (
                         <span className="text-xs text-muted-foreground">
