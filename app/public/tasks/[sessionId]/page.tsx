@@ -375,11 +375,14 @@ export default function AnonymousTasksPage() {
             )}
           </div>
           
-          <div className="flex items-center">
+          <div className="flex items-center flex-col">
             <SessionQRCode 
               url={qrCodeUrl}
               showSpotlight={true}
             />
+            <p className="text-xs text-muted-foreground mt-1 text-center">
+              Invite others to join
+            </p>
           </div>
         </div>
         

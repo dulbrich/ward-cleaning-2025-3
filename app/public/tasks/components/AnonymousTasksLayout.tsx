@@ -59,11 +59,14 @@ const AnonymousTasksLayout: FC<AnonymousTasksLayoutProps> = ({
             <Button 
               onClick={() => router.push(`/login?returnUrl=${encodeURIComponent(`/tasks?sessionId=${sessionId}`)}`)}
               size="lg"
-              className="shadow-lg"
+              className="shadow-lg bg-primary/90 hover:bg-primary transition-all"
             >
               <User className="mr-2 h-4 w-4" />
               Sign Up for Benefits
             </Button>
+            <p className="text-xs text-right text-muted-foreground pr-1">
+              Share the QR code to invite others
+            </p>
           </div>
         </div>
       )}

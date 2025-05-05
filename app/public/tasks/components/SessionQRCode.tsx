@@ -8,10 +8,10 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog";
-import { useToast } from "@/components/ui/use-toast";
 import { Check, Copy, Link, QrCode } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { FC, useState } from "react";
+import { useToast } from "../../../../components/ui/use-toast";
 
 interface SessionQRCodeProps {
   url: string;
@@ -103,7 +103,7 @@ const SessionQRCode: FC<SessionQRCodeProps> = ({
           <DialogHeader>
             <DialogTitle>Scan to Join Cleaning Session</DialogTitle>
             <DialogDescription>
-              Have others scan this code to join the cleaning session
+              Have others scan this code to join the cleaning session as guests or members
             </DialogDescription>
           </DialogHeader>
 
@@ -127,6 +127,10 @@ const SessionQRCode: FC<SessionQRCodeProps> = ({
                 Copy Link
               </Button>
             </div>
+            
+            <p className="text-xs text-muted-foreground mt-3 text-center">
+              Anyone can participate with or without an account. No sign-up required.
+            </p>
           </div>
         </DialogContent>
       </Dialog>

@@ -35,7 +35,7 @@ const ShareSessionDialog: React.FC<ShareSessionDialogProps> = ({
     ? `${window.location.protocol}//${window.location.host}`
     : '';
     
-  const publicSessionUrl = `${baseUrl}/public-session/${publicAccessCode}`;
+  const publicSessionUrl = `${baseUrl}/public/tasks/${sessionId}`;
   
   const handleCopy = () => {
     navigator.clipboard.writeText(publicSessionUrl).then(() => {
@@ -71,7 +71,7 @@ const ShareSessionDialog: React.FC<ShareSessionDialogProps> = ({
         <DialogHeader>
           <DialogTitle>Share Cleaning Session</DialogTitle>
           <DialogDescription>
-            Share this link with anyone you'd like to help with the cleaning tasks.
+            Share this link or QR code for anyone to join the cleaning session with or without an account.
           </DialogDescription>
         </DialogHeader>
         
@@ -104,7 +104,7 @@ const ShareSessionDialog: React.FC<ShareSessionDialogProps> = ({
             </div>
             
             <p className="text-sm text-muted-foreground mt-4">
-              Anyone with this link can join the cleaning session, even without an account.
+              Anyone with this link can participate as a guest or sign up for an account.
             </p>
             
             {canShare && (
@@ -130,7 +130,7 @@ const ShareSessionDialog: React.FC<ShareSessionDialogProps> = ({
                 includeMargin={false}
               />
               <p className="text-sm text-muted-foreground mt-4">
-                Scan this QR code to join the cleaning session.
+                Have others scan this QR code to join the cleaning session instantly.
               </p>
             </div>
           </TabsContent>
