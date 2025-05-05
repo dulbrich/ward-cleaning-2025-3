@@ -112,6 +112,7 @@ const TaskDetail: React.FC<TaskDetailProps> = ({
     // Only run this for tasks with an authenticated user assignment but missing proper assignee details
     const needsUserProfileDetails = sessionTask.status !== 'todo' && 
                                    sessionTask.assigned_to && 
+                                   !sessionTask.assigned_to_temp_user && // Don't run for temp users
                                    (!sessionTask.assignee?.avatar_url || !sessionTask.assignee?.display_name);
                                    
     if (!needsUserProfileDetails) return;
@@ -795,30 +796,47 @@ const TaskDetail: React.FC<TaskDetailProps> = ({
             </div>
           )}
           
-          {sessionTask.assignee && (
+          {sessionTask.assigned_to || sessionTask.assigned_to_temp_user ? (
             <div className="flex items-center gap-2">
-              <span className="text-sm font-medium">Assigned to:</span>
-              <div className="flex items-center gap-2">
-                <Avatar className="h-8 w-8">
-                  {sessionTask.assignee?.avatar_url && (
-                    <AvatarImage 
-                      src={getAvatarUrl(sessionTask.assignee.avatar_url)} 
-                      alt={sessionTask.assignee.display_name || "User"}
-                      className="object-cover"
-                      onError={(e) => {
-                        const target = e.target as HTMLImageElement;
-                        target.style.display = 'none';
-                      }}
-                    />
-                  )}
-                  <AvatarFallback>
-                    {(sessionTask.assignee.display_name || "User").substring(0, 2).toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
-                <span className="text-sm font-medium">{sessionTask.assignee.display_name}</span>
+              <span className="text-sm text-muted-foreground">Assigned to:</span>
+              <div className="flex items-center">
+                {sessionTask.assignee ? (
+                  // If assignee info is available, use it
+                  <>
+                    <Avatar className="h-8 w-8">
+                      {sessionTask.assignee.avatar_url && (
+                        <AvatarImage 
+                          src={getAvatarUrl(sessionTask.assignee.avatar_url)} 
+                          alt={sessionTask.assignee.display_name || "User"}
+                          className="object-cover"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            target.style.display = 'none';
+                          }}
+                        />
+                      )}
+                      <AvatarFallback>
+                        {(sessionTask.assignee.display_name || "User").substring(0, 2).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    <span className="text-sm font-medium ml-2">{sessionTask.assignee.display_name}</span>
+                  </>
+                ) : (
+                  // If no assignee info is available, show a generic avatar
+                  <>
+                    <Avatar className="h-8 w-8">
+                      <AvatarFallback>
+                        {sessionTask.assigned_to_temp_user ? "GU" : "??"}
+                      </AvatarFallback>
+                    </Avatar>
+                    <span className="text-sm font-medium ml-2">
+                      {sessionTask.assigned_to_temp_user ? "Guest User" : "Unknown User"}
+                    </span>
+                  </>
+                )}
               </div>
             </div>
-          )}
+          ) : null}
           
           {/* Task history */}
           {sessionTask.status === "done" && sessionTask.completed_at && (

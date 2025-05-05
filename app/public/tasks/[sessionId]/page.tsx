@@ -386,6 +386,7 @@ export default function AnonymousTasksPage() {
             // Find the assignee information
             let assignee = undefined;
             if (data.assigned_to) {
+              // For authenticated users
               let participant = participants.find(p => p.user_id === data.assigned_to);
               if (!participant) {
                 // Fetch participant if not in current state
@@ -397,9 +398,11 @@ export default function AnonymousTasksPage() {
                   .maybeSingle();
                 participant = fetched;
                 if (participant !== undefined) {
-                  setParticipants(prev => [...prev, participant as SessionParticipant]);
+                  // Update participants list with proper type checking
+                  setParticipants(prev => participant ? [...prev, participant as SessionParticipant] : prev);
                 }
               }
+              
               if (participant) {
                 assignee = {
                   display_name: participant.display_name,
@@ -407,6 +410,7 @@ export default function AnonymousTasksPage() {
                 };
               }
             } else if (data.assigned_to_temp_user) {
+              // For guest/anonymous users
               let participant = participants.find(p => p.temp_user_id === data.assigned_to_temp_user);
               if (!participant) {
                 // Fetch participant if not in current state
@@ -418,9 +422,11 @@ export default function AnonymousTasksPage() {
                   .maybeSingle();
                 participant = fetched;
                 if (participant !== undefined) {
-                  setParticipants(prev => [...prev, participant as SessionParticipant]);
+                  // Update participants list with proper type checking
+                  setParticipants(prev => participant ? [...prev, participant as SessionParticipant] : prev);
                 }
               }
+              
               if (participant) {
                 assignee = {
                   display_name: participant.display_name,
@@ -429,23 +435,18 @@ export default function AnonymousTasksPage() {
               }
             }
             
-            // Update the task with assignee information
-            const updatedTask = { ...data, assignee };
-            
-            // Verify we have valid task data - fetch task details if missing
-            if (!updatedTask.task || !updatedTask.task.id) {
-              const { data: taskDetails } = await fetchWardTasksWithServiceRole([updatedTask.task_id]);
-              if (taskDetails && taskDetails.length > 0) {
-                updatedTask.task = taskDetails[0];
-              }
-            }
+            const taskWithDetails = {
+              ...data,
+              assignee,
+              task: data.task
+            };
             
             setSessionTasks(prevTasks => {
-              const exists = prevTasks.some(task => task.id === updatedTask.id);
+              const exists = prevTasks.some(task => task.id === taskWithDetails.id);
               if (exists) {
-                return prevTasks.map(task => task.id === updatedTask.id ? updatedTask : task);
+                return prevTasks.map(task => task.id === taskWithDetails.id ? taskWithDetails : task);
               } else {
-                return [...prevTasks, updatedTask];
+                return [...prevTasks, taskWithDetails];
               }
             });
           }
@@ -555,69 +556,115 @@ export default function AnonymousTasksPage() {
     }
   }, [sessionTasks, selectedTask]);
 
-  // Handle task click
-  const handleTaskClick = useCallback((task: SessionTask) => {
-    // Validate task before showing details
-    if (!task || !task.id) {
-      console.error("Invalid task clicked:", task);
-      toast({
-        title: "Error",
-        description: "Cannot view this task. Invalid task data.",
-        duration: 3000,
+  // Add an effect to fetch participant details for tasks that need them
+  useEffect(() => {
+    // Function to fetch participant details for all tasks that need them
+    const fetchParticipantDetails = async () => {
+      // Find tasks that need participant details (have assigned_to or assigned_to_temp_user but no assignee)
+      const tasksNeedingDetails = sessionTasks.filter(task => 
+        (task.assigned_to || task.assigned_to_temp_user) && !task.assignee
+      );
+      
+      if (tasksNeedingDetails.length === 0) return;
+      
+      // Fetch all participant data
+      const { data: allParticipants, error } = await supabase
+        .from("session_participants")
+        .select("*")
+        .eq("session_id", sessionId);
+        
+      if (error || !allParticipants) {
+        console.error("Error fetching participants:", error);
+        return;
+      }
+      
+      // Update tasks with assignee information
+      setSessionTasks(prevTasks => {
+        return prevTasks.map(task => {
+          // Skip tasks that already have assignee info
+          if (task.assignee) return task;
+          
+          let assigneeParticipant;
+          
+          // Find the participant for this task
+          if (task.assigned_to) {
+            assigneeParticipant = allParticipants.find((p: SessionParticipant) => p.user_id === task.assigned_to);
+          } else if (task.assigned_to_temp_user) {
+            assigneeParticipant = allParticipants.find((p: SessionParticipant) => p.temp_user_id === task.assigned_to_temp_user);
+          }
+          
+          // If found, add the assignee info
+          if (assigneeParticipant) {
+            return {
+              ...task,
+              assignee: {
+                display_name: assigneeParticipant.display_name,
+                avatar_url: assigneeParticipant.avatar_url
+              }
+            };
+          }
+          
+          return task;
+        });
       });
-      return;
-    }
+    };
     
-    // Validate task has task details
-    if (!task.task) {
-      console.error("Task missing details:", task);
-      toast({
-        title: "Error",
-        description: "Cannot view this task. Missing task details.",
-        duration: 3000,
-      });
-      return;
+    if (sessionId && sessionTasks.length > 0) {
+      fetchParticipantDetails();
     }
+  }, [supabase, sessionId, sessionTasks]);
+
+  // Function to record a task view
+  const recordTaskView = useCallback((task: SessionTask) => {
+    if (!currentParticipant) return;
+    
+    if (currentParticipant.is_authenticated) {
+      // For authenticated users, use the standard supabase client
+      try {
+        supabase
+          .from("task_viewers")
+          .upsert({
+            session_task_id: task.id,
+            participant_id: currentParticipant.id,
+            started_viewing_at: new Date().toISOString()
+          }, {
+            onConflict: 'session_task_id,participant_id',
+            ignoreDuplicates: false
+          })
+          .then(({ error }: { error: any }) => {
+            if (error) console.error("Error recording task view:", error);
+          })
+          .catch((err: any) => {
+            console.error("Error recording task view:", err);
+          });
+      } catch (err) {
+        console.error("Exception recording task view:", err);
+      }
+    } else {
+      // For anonymous users, use the service client function
+      recordAnonymousTaskView({
+        session_task_id: task.id,
+        participant_id: currentParticipant.id,
+        started_viewing_at: new Date().toISOString()
+      }).catch(err => {
+        console.error("Error recording anonymous task view:", err);
+      });
+    }
+  }, [supabase, currentParticipant]);
+
+  // Update the updateTaskWithFallback function call to pass all participant info
+  const handleTaskClick = useCallback(async (taskId: string) => {
+    const task = sessionTasks.find(t => t.id === taskId);
+    if (!task) return;
     
     setSelectedTask(task);
     setShowTaskDetail(true);
     
-    // Record that user is viewing this task
+    // Record the task view when a task is clicked
     if (currentParticipant) {
-      if (currentParticipant.is_authenticated) {
-        // For authenticated users, use the standard supabase client
-        try {
-          supabase
-            .from("task_viewers")
-            .upsert({
-              session_task_id: task.id,
-              participant_id: currentParticipant.id,
-              started_viewing_at: new Date().toISOString()
-            }, {
-              onConflict: 'session_task_id,participant_id',
-              ignoreDuplicates: false
-            })
-            .then(({ error }: { error: any }) => {
-              if (error) console.error("Error recording task view:", error);
-            })
-            .catch((err: any) => {
-              console.error("Error recording task view:", err);
-            });
-        } catch (err) {
-          console.error("Exception recording task view:", err);
-        }
-      } else {
-        // For anonymous users, use the service client function
-        recordAnonymousTaskView({
-          session_task_id: task.id,
-          participant_id: currentParticipant.id,
-          started_viewing_at: new Date().toISOString()
-        }).catch(err => {
-          console.error("Error recording anonymous task view:", err);
-        });
-      }
+      recordTaskView(task);
     }
-  }, [supabase, currentParticipant, toast]);
+  }, [sessionTasks, currentParticipant, recordTaskView]);
 
   // Handle task detail close
   const handleTaskDetailClose = useCallback(() => {
@@ -695,15 +742,39 @@ export default function AnonymousTasksPage() {
     }
   }, [sessionId, toast]);
 
-  // Optimistically update task status
+  // Setup the optimisticUpdateTask function to also update assignee information
   const optimisticUpdateTask = useCallback((taskId: string, updateData: Partial<SessionTask>) => {
     setSessionTasks(prevTasks => {
-      const updatedTasks = prevTasks.map(task =>
-        task.id === taskId ? { ...task, ...updateData } : task
-      );
+      // Get the current participant's info if this is an assignment
+      let assigneeInfo = undefined;
+      if (updateData.status === 'doing' && currentParticipant) {
+        if (updateData.assigned_to_temp_user === currentParticipant.temp_user_id ||
+            updateData.assigned_to === currentParticipant.user_id) {
+          // This task is being assigned to the current user
+          assigneeInfo = {
+            display_name: currentParticipant.display_name,
+            avatar_url: currentParticipant.avatar_url
+          };
+        }
+      }
+      
+      const updatedTasks = prevTasks.map(task => {
+        if (task.id === taskId) {
+          // If we're assigning the task and have assignee info, include it
+          if (assigneeInfo && (updateData.status === 'doing')) {
+            return { 
+              ...task, 
+              ...updateData,
+              assignee: assigneeInfo
+            };
+          }
+          return { ...task, ...updateData };
+        }
+        return task;
+      });
       return updatedTasks;
     });
-  }, []);
+  }, [currentParticipant]);
 
   // Memoize the grouped tasks to avoid re-sorting on every render
   const { todoTasks, doingTasks, doneTasks, myTasks } = useMemo(() => {
@@ -888,7 +959,7 @@ export default function AnonymousTasksPage() {
                 <TaskCard 
                   key={task.id} 
                   task={task} 
-                  onClick={() => handleTaskClick(task)} 
+                  onClick={() => handleTaskClick(task.id)} 
                 />
               ))}
             </div>
@@ -907,7 +978,7 @@ export default function AnonymousTasksPage() {
                 <TaskCard 
                   key={task.id} 
                   task={task} 
-                  onClick={() => handleTaskClick(task)}
+                  onClick={() => handleTaskClick(task.id)}
                   orderNumber={index + 1}
                 />
               ))}
@@ -929,7 +1000,7 @@ export default function AnonymousTasksPage() {
                 <TaskCard 
                   key={task.id} 
                   task={task} 
-                  onClick={() => handleTaskClick(task)}
+                  onClick={() => handleTaskClick(task.id)}
                   orderNumber={index + 1}
                 />
               ))}
@@ -951,7 +1022,7 @@ export default function AnonymousTasksPage() {
                 <TaskCard 
                   key={task.id} 
                   task={task} 
-                  onClick={() => handleTaskClick(task)}
+                  onClick={() => handleTaskClick(task.id)}
                 />
               ))}
               {doneTasks.length === 0 && (

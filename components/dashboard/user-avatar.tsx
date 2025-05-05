@@ -50,11 +50,18 @@ export const updateTaskWithFallback = async (
   try {
     // For guest users, make sure we're updating with the temp user ID
     if (currentParticipant?.temp_user_id && !updateData.assigned_to) {
+      // Include the display name and avatar for realtime updates
+      const assigneeInfo = currentParticipant ? {
+        display_name: currentParticipant.display_name,
+        avatar_url: currentParticipant.avatar_url
+      } : undefined;
+      
       updateData = {
         ...updateData,
         assigned_to_temp_user: currentParticipant.temp_user_id,
         status: updateData.status || "doing",  // Default to "doing" if status not specified
-        assigned_at: new Date().toISOString()
+        assigned_at: new Date().toISOString(),
+        assignee: assigneeInfo
       };
     }
     
@@ -80,4 +87,36 @@ export const updateTaskWithFallback = async (
     console.error("Exception updating task:", err);
     return { success: false, data: null, error: err };
   }
+};
+
+export const debugTask = async (
+  taskId: string,
+  action: string,
+  supabase: any,
+  currentParticipant: SessionParticipant | null
+) => {
+  console.log('=== DEBUG TASK ===');
+  console.log('Action:', action);
+  console.log('Task ID:', taskId);
+  console.log('Current Participant:', currentParticipant);
+  
+  // List all policies for this table
+  const { data: policies } = await supabase
+    .rpc('get_policies_for_table', { table_name: 'cleaning_session_tasks' });
+  
+  console.log('Policies:', policies);
+  
+  // Try a simple update with minimal data
+  const updateData = { status: 'doing' };
+  console.log('Attempting update with:', updateData);
+  
+  const { data, error } = await supabase
+    .from('cleaning_session_tasks')
+    .update(updateData)
+    .eq('id', taskId)
+    .select();
+  
+  console.log('Update result:', { data, error });
+  
+  return { data, error };
 }; 
