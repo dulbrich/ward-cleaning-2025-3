@@ -48,39 +48,36 @@ export const updateTaskWithFallback = async (
   currentParticipant: SessionParticipant | null
 ) => {
   try {
-    // Try to update with standard client first to trigger real-time events
-    const { error } = await supabase
+    // For guest users, make sure we're updating with the temp user ID
+    if (currentParticipant?.temp_user_id && !updateData.assigned_to) {
+      updateData = {
+        ...updateData,
+        assigned_to_temp_user: currentParticipant.temp_user_id,
+        status: updateData.status || "doing",  // Default to "doing" if status not specified
+        assigned_at: new Date().toISOString()
+      };
+    }
+    
+    // Log the update attempt for debugging
+    console.log('Attempting task update:', { taskId, updateData });
+    
+    // Try to update with standard client to trigger real-time events
+    const { data, error } = await supabase
       .from('cleaning_session_tasks')
       .update(updateData)
-      .eq('id', taskId);
+      .eq('id', taskId)
+      .select();
+    
+    console.log('Update result:', { data, error });
     
     if (!error) {
-      // Success with standard client
-      return { success: true, error: null };
+      return { success: true, data, error: null };
     }
     
-    // If standard client fails and we have a temp user, fallback to a method
-    // that will trigger real-time updates
-    if (currentParticipant?.temp_user_id) {
-      // This approach uses a more permissive RLS policy that exists
-      const { error: fallbackError } = await supabase
-        .from('cleaning_session_tasks')
-        .update({
-          ...updateData,
-          assigned_to_temp_user: currentParticipant.temp_user_id
-        })
-        .eq('id', taskId);
-      
-      if (!fallbackError) {
-        return { success: true, error: null };
-      }
-      
-      return { success: false, error: fallbackError };
-    }
-    
-    return { success: false, error };
+    console.error('Error updating task:', error);
+    return { success: false, data: null, error };
   } catch (err) {
-    console.error("Error updating task:", err);
-    return { success: false, error: err };
+    console.error("Exception updating task:", err);
+    return { success: false, data: null, error: err };
   }
 }; 
