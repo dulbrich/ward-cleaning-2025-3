@@ -2,8 +2,15 @@
 
 import { Skeleton } from "@/components/ui/skeleton";
 import { createClient } from "@/utils/supabase/client";
+import {
+    createParticipantWithServiceRole,
+    fetchWardTasksWithServiceRole,
+    recordAnonymousTaskView,
+    removeAnonymousTaskView
+} from "@/utils/supabase/serviceClient";
+import dynamic from "next/dynamic";
 import { useParams, useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useToast } from "../../../../components/ui/use-toast";
 
 import AnonymousOnboardingModal from "../components/AnonymousOnboardingModal";
@@ -12,9 +19,24 @@ import GuestLimitationsTooltip from "../components/GuestLimitationsTooltip";
 import GuestProfileSetup from "../components/GuestProfileSetup";
 import SessionQRCode from "../components/SessionQRCode";
 
-// Import existing TaskDetail and other components from the main app
+// Import existing TaskCard from the main app
 import TaskCard from "@/app/app/tasks/components/TaskCard";
-import TaskDetail from "@/app/app/tasks/components/TaskDetail";
+
+// Lazy load TaskDetail component for better initial performance
+const TaskDetail = dynamic(
+  () => import("@/app/app/tasks/components/TaskDetail").catch(err => {
+    console.error("Error loading TaskDetail component:", err);
+    return () => (
+      <div className="bg-destructive/20 p-4 rounded-lg">
+        Error loading task details. Please try again.
+      </div>
+    );
+  }),
+  { 
+    loading: () => <div className="fixed inset-0 bg-black/50 flex items-center justify-center"><Skeleton className="h-96 w-96 max-w-md rounded-lg" /></div>,
+    ssr: false
+  }
+);
 
 // Define types locally instead of importing from main app
 interface WardTask {
@@ -131,19 +153,85 @@ export default function AnonymousTasksPage() {
           .single();
           
         if (sessionError) throw sessionError;
+        if (!sessionData) throw new Error("Session not found");
+        
         setSession(sessionData);
         
-        // Fetch session tasks
-        const { data: tasksData, error: tasksError } = await supabase
+        // First fetch all tasks for this session (no joins yet)
+        const { data: sessionTasks, error: sessionTasksError } = await supabase
           .from("cleaning_session_tasks")
-          .select(`
-            *,
-            task:ward_tasks(*)
-          `)
+          .select("*")
           .eq("session_id", sessionId);
-          
-        if (tasksError) throw tasksError;
         
+        if (sessionTasksError) throw sessionTasksError;
+        if (!sessionTasks || sessionTasks.length === 0) {
+          // No tasks to display
+          setSessionTasks([]);
+          console.log("No tasks found for this session");
+          return;
+        }
+        
+        // Get all task IDs to fetch details
+        const taskIds = sessionTasks.map((task: any) => task.task_id).filter(Boolean);
+        
+        if (taskIds.length === 0) {
+          console.error("No task IDs found in session tasks");
+          setSessionTasks([]);
+          return;
+        }
+        
+        // Use the service client to fetch ward tasks instead of the regular supabase client
+        // to bypass RLS for anonymous users
+        const { data: taskDetails, error: taskDetailsError } = await fetchWardTasksWithServiceRole(taskIds);
+        
+        if (taskDetailsError) throw taskDetailsError;
+        
+        // Add these debug logs
+        console.log(`Fetched ${taskDetails?.length || 0} task details:`, 
+          taskDetails ? taskDetails.slice(0, 2).map((t: any) => ({
+            id: t.id,
+            title: t.title,
+            instructions: t.instructions ? (t.instructions.substring(0, 20) + '...') : 'No instructions'
+          })) : 'No details');
+        
+        // Create a map for quick lookup
+        const taskDetailsMap: Record<string, any> = {};
+        if (taskDetails) {
+          for (const task of taskDetails as any[]) {
+            if (task && task.id) {
+              taskDetailsMap[task.id] = task;
+            }
+          }
+        }
+        
+        // Join the tasks with their details
+        const fullTasks = (sessionTasks as any[]).map((sessionTask) => {
+          const taskDetail = taskDetailsMap[sessionTask.task_id];
+          if (!taskDetail) {
+            console.warn(`Missing task details for task_id ${sessionTask.task_id}`);
+            
+            // Create a placeholder task record with basic info
+            return {
+              ...sessionTask,
+              task: {
+                id: sessionTask.task_id,
+                title: `Task ${sessionTask.task_id.substring(0, 6)}`,
+                subtitle: "Details unavailable",
+                instructions: "This task's details could not be loaded.",
+                equipment: "Unknown",
+                priority: "normal"
+              }
+            };
+          }
+          
+          return {
+            ...sessionTask,
+            task: taskDetail,
+          };
+        }) as SessionTask[];
+        
+        console.log(`Successfully processed ${fullTasks.length} of ${sessionTasks.length} tasks`);
+
         // Fetch participants
         const { data: participantsData, error: participantsError } = await supabase
           .from("session_participants")
@@ -153,34 +241,70 @@ export default function AnonymousTasksPage() {
         if (participantsError) throw participantsError;
         setParticipants(participantsData || []);
         
-        // Enhance tasks with assignee information
-        const enhancedTasks = tasksData ? tasksData.map((task: any) => {
+        // Enhance tasks with assignee information and ensure all tasks have complete data
+        const enhancedTasks = fullTasks.map((task: SessionTask) => {
           const assignee = participantsData?.find((p: any) => 
             (p.user_id && p.user_id === task.assigned_to) || 
             (p.temp_user_id && p.temp_user_id === task.assigned_to_temp_user)
           );
           
-          return {
+          // Check if task data is complete
+          const isTaskDataComplete = task.task && 
+            task.task.title && 
+            task.task.instructions && 
+            task.task.equipment;
+          
+          // Create a sanitized task object
+          const taskWithAssignee = {
             ...task,
             assignee: assignee ? {
               display_name: assignee.display_name,
               avatar_url: assignee.avatar_url
             } : undefined
           };
-        }) : [];
-        
+          
+          // If task data is incomplete, add default values
+          if (!isTaskDataComplete) {
+            return {
+              ...taskWithAssignee,
+              task: {
+                id: task.task_id,
+                title: task.task?.title || `Task ${task.task_id.substring(0, 6)}`,
+                subtitle: task.task?.subtitle || "Details unavailable",
+                instructions: task.task?.instructions || "Task details could not be loaded properly.",
+                equipment: task.task?.equipment || "Unknown",
+                safety: task.task?.safety || "Exercise caution when performing this task.",
+                priority: task.task?.priority || "normal",
+                kid_friendly: task.task?.kid_friendly || false,
+                points: task.task?.points || 5
+              }
+            };
+          }
+          
+          return taskWithAssignee;
+        });
+
         setSessionTasks(enhancedTasks);
         
         // Check for returning user
         if (isReturningUser) {
           const tempUserId = localStorage.getItem(`tempUserId_${sessionId}`);
-          const { data: existingParticipant } = await supabase
+          
+          if (!tempUserId) {
+            setIsReturningUser(false);
+            setShowOnboarding(true);
+            return;
+          }
+          
+          const { data: existingParticipant, error: participantError } = await supabase
             .from("session_participants")
             .select("*")
             .eq("session_id", sessionId)
             .eq("temp_user_id", tempUserId)
             .maybeSingle();
             
+          if (participantError) throw participantError;
+          
           if (existingParticipant) {
             // Update last active time
             await supabase
@@ -219,43 +343,307 @@ export default function AnonymousTasksPage() {
     }
   }, [supabase, sessionId, isReturningUser, toast]);
 
-  // Handle task detail view
+  // Setup real-time subscriptions
+  useEffect(() => {
+    if (!session) return;
+    
+    const currentSessionId = session.id;
+    
+    // Force a fresh supabase client for real-time connections
+    const realtimeClient = createClient();
+    
+    // Subscribe to task changes
+    const taskSubscription = realtimeClient
+      .channel(`cleaning_session_tasks:${currentSessionId}`, {
+        config: {
+          broadcast: { self: true }  // Make sure we receive our own updates
+        }
+      })
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'cleaning_session_tasks',
+        filter: `session_id=eq.${currentSessionId}`
+      }, async (payload: { 
+        eventType: string; 
+        new: any; 
+        old: any; 
+        table: string;
+      }) => {
+        // Handle task updates
+        if (payload.eventType === 'UPDATE') {
+          // For updates, fetch the complete updated task with task details and assignee
+          const { data } = await supabase
+            .from("cleaning_session_tasks")
+            .select(`
+              *,
+              task:ward_tasks(*)
+            `)
+            .eq("id", payload.new.id)
+            .single();
+            
+          if (data) {
+            // Find the assignee information
+            let assignee = undefined;
+            if (data.assigned_to) {
+              let participant = participants.find(p => p.user_id === data.assigned_to);
+              if (!participant) {
+                // Fetch participant if not in current state
+                const { data: fetched } = await supabase
+                  .from("session_participants")
+                  .select("*")
+                  .eq("user_id", data.assigned_to)
+                  .eq("session_id", currentSessionId)
+                  .maybeSingle();
+                participant = fetched;
+                if (participant !== undefined) {
+                  setParticipants(prev => [...prev, participant as SessionParticipant]);
+                }
+              }
+              if (participant) {
+                assignee = {
+                  display_name: participant.display_name,
+                  avatar_url: participant.avatar_url
+                };
+              }
+            } else if (data.assigned_to_temp_user) {
+              let participant = participants.find(p => p.temp_user_id === data.assigned_to_temp_user);
+              if (!participant) {
+                // Fetch participant if not in current state
+                const { data: fetched } = await supabase
+                  .from("session_participants")
+                  .select("*")
+                  .eq("temp_user_id", data.assigned_to_temp_user)
+                  .eq("session_id", currentSessionId)
+                  .maybeSingle();
+                participant = fetched;
+                if (participant !== undefined) {
+                  setParticipants(prev => [...prev, participant as SessionParticipant]);
+                }
+              }
+              if (participant) {
+                assignee = {
+                  display_name: participant.display_name,
+                  avatar_url: participant.avatar_url
+                };
+              }
+            }
+            
+            // Update the task with assignee information
+            const updatedTask = { ...data, assignee };
+            
+            // Verify we have valid task data - fetch task details if missing
+            if (!updatedTask.task || !updatedTask.task.id) {
+              const { data: taskDetails } = await fetchWardTasksWithServiceRole([updatedTask.task_id]);
+              if (taskDetails && taskDetails.length > 0) {
+                updatedTask.task = taskDetails[0];
+              }
+            }
+            
+            setSessionTasks(prevTasks => {
+              const exists = prevTasks.some(task => task.id === updatedTask.id);
+              if (exists) {
+                return prevTasks.map(task => task.id === updatedTask.id ? updatedTask : task);
+              } else {
+                return [...prevTasks, updatedTask];
+              }
+            });
+          }
+        } else if (payload.eventType === 'INSERT') {
+          // Fetch the complete task data with task details
+          const { data } = await supabase
+            .from("cleaning_session_tasks")
+            .select(`
+              *,
+              task:ward_tasks(*)
+            `)
+            .eq("id", payload.new.id)
+            .single();
+            
+          if (data) {
+            // If task details are missing, fetch them using service client
+            if (!data.task || !data.task.id) {
+              const { data: taskDetails } = await fetchWardTasksWithServiceRole([data.task_id]);
+              if (taskDetails && taskDetails.length > 0) {
+                data.task = taskDetails[0];
+              }
+            }
+            
+            setSessionTasks(prevTasks => {
+              const exists = prevTasks.some(task => task.id === data.id);
+              if (exists) {
+                return prevTasks.map(task => task.id === data.id ? data : task);
+              } else {
+                return [...prevTasks, data];
+              }
+            });
+          }
+        } else if (payload.eventType === 'DELETE') {
+          setSessionTasks(prevTasks => 
+            prevTasks.filter(task => task.id !== payload.old.id)
+          );
+        }
+      })
+      .subscribe();
+      
+    // Subscribe to participant changes
+    const participantSubscription = realtimeClient
+      .channel(`session_participants:${currentSessionId}`, {
+        config: {
+          broadcast: { self: true }  // Make sure we receive our own updates
+        }
+      })
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'session_participants',
+        filter: `session_id=eq.${currentSessionId}`
+      }, (payload: { 
+        eventType: string; 
+        new: any; 
+        old: any;
+      }) => {
+        if (payload.eventType === 'UPDATE') {
+          setParticipants(prevParticipants => 
+            prevParticipants.map(participant => 
+              participant.id === payload.new.id ? { ...participant, ...payload.new } : participant
+            )
+          );
+        } else if (payload.eventType === 'INSERT') {
+          setParticipants(prevParticipants => [...prevParticipants, payload.new as SessionParticipant]);
+        } else if (payload.eventType === 'DELETE') {
+          setParticipants(prevParticipants => 
+            prevParticipants.filter(participant => participant.id !== payload.old.id)
+          );
+        }
+      })
+      .subscribe();
+      
+    // Subscribe to session changes
+    const sessionSubscription = realtimeClient
+      .channel(`cleaning_sessions:${currentSessionId}`, {
+        config: {
+          broadcast: { self: true }  // Make sure we receive our own updates
+        }
+      })
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'cleaning_sessions',
+        filter: `id=eq.${currentSessionId}`
+      }, (payload: {
+        eventType: string;
+        new: any;
+        old: any;
+      }) => {
+        setSession(payload.new as CleaningSession);
+      })
+      .subscribe();
+    
+    return () => {
+      realtimeClient.removeChannel(taskSubscription);
+      realtimeClient.removeChannel(participantSubscription);
+      realtimeClient.removeChannel(sessionSubscription);
+    };
+  }, [supabase, session, participants, sessionId]);
+  
+  // In case task gets deleted
+  useEffect(() => {
+    if (selectedTask && !sessionTasks.find(t => t.id === selectedTask.id)) {
+      setShowTaskDetail(false);
+      setSelectedTask(null);
+    }
+  }, [sessionTasks, selectedTask]);
+
+  // Handle task click
   const handleTaskClick = useCallback((task: SessionTask) => {
+    // Validate task before showing details
+    if (!task || !task.id) {
+      console.error("Invalid task clicked:", task);
+      toast({
+        title: "Error",
+        description: "Cannot view this task. Invalid task data.",
+        duration: 3000,
+      });
+      return;
+    }
+    
+    // Validate task has task details
+    if (!task.task) {
+      console.error("Task missing details:", task);
+      toast({
+        title: "Error",
+        description: "Cannot view this task. Missing task details.",
+        duration: 3000,
+      });
+      return;
+    }
+    
     setSelectedTask(task);
     setShowTaskDetail(true);
     
     // Record that user is viewing this task
     if (currentParticipant) {
-      supabase
-        .from("task_viewers")
-        .upsert({
+      if (currentParticipant.is_authenticated) {
+        // For authenticated users, use the standard supabase client
+        try {
+          supabase
+            .from("task_viewers")
+            .upsert({
+              session_task_id: task.id,
+              participant_id: currentParticipant.id,
+              started_viewing_at: new Date().toISOString()
+            }, {
+              onConflict: 'session_task_id,participant_id',
+              ignoreDuplicates: false
+            })
+            .then(({ error }: { error: any }) => {
+              if (error) console.error("Error recording task view:", error);
+            })
+            .catch((err: any) => {
+              console.error("Error recording task view:", err);
+            });
+        } catch (err) {
+          console.error("Exception recording task view:", err);
+        }
+      } else {
+        // For anonymous users, use the service client function
+        recordAnonymousTaskView({
           session_task_id: task.id,
           participant_id: currentParticipant.id,
           started_viewing_at: new Date().toISOString()
-        }, {
-          onConflict: 'session_task_id,participant_id',
-          ignoreDuplicates: false
-        })
-        .then(({ error }) => {
-          if (error) console.error("Error recording task view:", error);
+        }).catch(err => {
+          console.error("Error recording anonymous task view:", err);
         });
+      }
     }
-  }, [supabase, currentParticipant]);
+  }, [supabase, currentParticipant, toast]);
 
   // Handle task detail close
   const handleTaskDetailClose = useCallback(() => {
     // Remove user from viewers when closing the detail view
     if (selectedTask && currentParticipant) {
-      supabase
-        .from("task_viewers")
-        .delete()
-        .match({
+      if (currentParticipant.is_authenticated) {
+        // For authenticated users, use the standard supabase client
+        supabase
+          .from("task_viewers")
+          .delete()
+          .match({
+            session_task_id: selectedTask.id,
+            participant_id: currentParticipant.id
+          })
+          .then(({ error }: { error: any }) => {
+            if (error) console.error("Error removing task view:", error);
+          });
+      } else {
+        // For anonymous users, use the service client function
+        removeAnonymousTaskView({
           session_task_id: selectedTask.id,
           participant_id: currentParticipant.id
-        })
-        .then(({ error }) => {
-          if (error) console.error("Error removing task view:", error);
+        }).catch(err => {
+          console.error("Error removing anonymous task view:", err);
         });
+      }
     }
     
     setShowTaskDetail(false);
@@ -275,25 +663,21 @@ export default function AnonymousTasksPage() {
     avatarUrl: string;
   }) => {
     try {
-      // Create participant record in the database
-      const { data: newParticipant, error } = await supabase
-        .from("session_participants")
-        .insert({
-          session_id: sessionId,
-          temp_user_id: profile.tempUserId,
-          display_name: profile.displayName,
-          avatar_url: profile.avatarUrl,
-          is_authenticated: false,
-          last_active_at: new Date().toISOString()
-        })
-        .select()
-        .single();
+      // Use our service role client to bypass RLS
+      const { data: newParticipant, error } = await createParticipantWithServiceRole({
+        session_id: sessionId,
+        temp_user_id: profile.tempUserId,
+        display_name: profile.displayName,
+        avatar_url: profile.avatarUrl,
+        is_authenticated: false,
+        last_active_at: new Date().toISOString()
+      });
         
       if (error) {
         throw error;
       }
       
-      setCurrentParticipant(newParticipant);
+      setCurrentParticipant(newParticipant[0]);
       setShowProfileSetup(false);
       
       toast({
@@ -309,7 +693,7 @@ export default function AnonymousTasksPage() {
         variant: "destructive",
       });
     }
-  }, [supabase, sessionId, toast]);
+  }, [sessionId, toast]);
 
   // Optimistically update task status
   const optimisticUpdateTask = useCallback((taskId: string, updateData: Partial<SessionTask>) => {
@@ -321,49 +705,71 @@ export default function AnonymousTasksPage() {
     });
   }, []);
 
-  // Group tasks by status (reusing logic from original tasks page)
-  const todoTasks = sessionTasks
-    .filter(task => task.status === "todo")
-    .sort((a, b) => {
-      // Sort "Do First" items to the top
-      if (a.task.priority === 'do_first' && b.task.priority !== 'do_first') return -1;
-      if (a.task.priority !== 'do_first' && b.task.priority === 'do_first') return 1;
-      // Sort "Do Last" items to the bottom
-      if (a.task.priority === 'do_last' && b.task.priority !== 'do_last') return 1;
-      if (a.task.priority !== 'do_last' && b.task.priority === 'do_last') return -1;
-      // Default sort by title if priorities are the same
-      return a.task.title.localeCompare(b.task.title);
-    });
-
-  const doingTasks = sessionTasks
-    .filter(task => task.status === "doing")
-    .sort((a, b) => {
-      // Similar priority sorting
-      if (a.task.priority === 'do_first' && b.task.priority !== 'do_first') return -1;
-      if (a.task.priority !== 'do_first' && b.task.priority === 'do_first') return 1;
-      if (a.task.priority === 'do_last' && b.task.priority !== 'do_last') return 1;
-      if (a.task.priority !== 'do_last' && b.task.priority === 'do_last') return -1;
-      return a.task.title.localeCompare(b.task.title);
-    });
-
-  const doneTasks = sessionTasks
-    .filter(task => task.status === "done")
-    .sort((a, b) => (a.completed_at && b.completed_at) 
-      ? new Date(b.completed_at).getTime() - new Date(a.completed_at).getTime() 
-      : a.task.title.localeCompare(b.task.title)
-    );
-
-  const myTasks = sessionTasks.filter(task => {
-    if (currentParticipant?.temp_user_id) {
-      return task.assigned_to_temp_user === currentParticipant.temp_user_id;
+  // Memoize the grouped tasks to avoid re-sorting on every render
+  const { todoTasks, doingTasks, doneTasks, myTasks } = useMemo(() => {
+    // Make sure we have valid sessionTasks
+    if (!sessionTasks || !Array.isArray(sessionTasks)) {
+      return { todoTasks: [], doingTasks: [], doneTasks: [], myTasks: [] };
     }
-    return false;
-  });
+    
+    const todo = sessionTasks
+      .filter(task => task && task.status === "todo" && task.task)
+      .sort((a, b) => {
+        // Null checks for task property
+        if (!a.task || !b.task) return 0;
+        
+        // Sort "Do First" items to the top
+        if (a.task.priority === 'do_first' && b.task.priority !== 'do_first') return -1;
+        if (a.task.priority !== 'do_first' && b.task.priority === 'do_first') return 1;
+        // Sort "Do Last" items to the bottom
+        if (a.task.priority === 'do_last' && b.task.priority !== 'do_last') return 1;
+        if (a.task.priority !== 'do_last' && b.task.priority === 'do_last') return -1;
+        // Default sort by title if priorities are the same
+        return (a.task.title || '').localeCompare(b.task.title || '');
+      });
+
+    const doing = sessionTasks
+      .filter(task => task && task.status === "doing" && task.task)
+      .sort((a, b) => {
+        // Null checks for task property
+        if (!a.task || !b.task) return 0;
+        
+        // Similar priority sorting
+        if (a.task.priority === 'do_first' && b.task.priority !== 'do_first') return -1;
+        if (a.task.priority !== 'do_first' && b.task.priority === 'do_first') return 1;
+        if (a.task.priority === 'do_last' && b.task.priority !== 'do_last') return 1;
+        if (a.task.priority !== 'do_last' && b.task.priority === 'do_last') return -1;
+        return (a.task.title || '').localeCompare(b.task.title || '');
+      });
+
+    const done = sessionTasks
+      .filter(task => task && task.status === "done" && task.task)
+      .sort((a, b) => {
+        // Null checks for task property  
+        if (!a.task || !b.task) return 0;
+        
+        return (a.completed_at && b.completed_at) 
+          ? new Date(b.completed_at).getTime() - new Date(a.completed_at).getTime() 
+          : (a.task.title || '').localeCompare(b.task.title || '');
+      });
+
+    const my = currentParticipant?.temp_user_id
+      ? sessionTasks.filter(task => task && task.assigned_to_temp_user === currentParticipant.temp_user_id && task.task)
+      : [];
+
+    return { todoTasks: todo, doingTasks: doing, doneTasks: done, myTasks: my };
+  }, [sessionTasks, currentParticipant]);
 
   // In case task gets deleted
-  const selectedTaskFull = selectedTask
-    ? sessionTasks.find(t => t.id === selectedTask.id) || selectedTask
-    : null;
+  const selectedTaskFull = useMemo(() => {
+    if (!selectedTask) return null;
+    
+    // Try to find the task in the current sessionTasks
+    const foundTask = sessionTasks.find(t => t && t.id === selectedTask.id);
+    
+    // If found and has a valid task property, return it, otherwise fall back to selectedTask
+    return (foundTask && foundTask.task) ? foundTask : selectedTask;
+  }, [selectedTask, sessionTasks]);
 
   if (isLoading) {
     return (

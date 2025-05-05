@@ -32,6 +32,19 @@ interface DefaultAvatar {
   avatar_name: string;
 }
 
+// Fallback avatars in case database fetch fails
+const FALLBACK_AVATARS = [
+  { id: "default", avatar_url: "/images/avatars/default.png", avatar_name: "Default Avatar" },
+  { id: "1", avatar_url: "/images/avatars/avatar1.png", avatar_name: "Avatar 1" },
+  { id: "2", avatar_url: "/images/avatars/avatar2.png", avatar_name: "Avatar 2" },
+  { id: "3", avatar_url: "/images/avatars/avatar3.png", avatar_name: "Avatar 3" },
+  { id: "4", avatar_url: "/images/avatars/avatar4.png", avatar_name: "Avatar 4" },
+  { id: "5", avatar_url: "/images/avatars/avatar5.png", avatar_name: "Avatar 5" },
+  { id: "m1", avatar_url: "/images/avatars/monster_1.png", avatar_name: "Monster 1" },
+  { id: "m2", avatar_url: "/images/avatars/monster_2.png", avatar_name: "Monster 2" },
+  { id: "m3", avatar_url: "/images/avatars/monster_3.png", avatar_name: "Monster 3" },
+];
+
 const funnyNames = [
   "Speedy Cleaner",
   "Dust Buster",
@@ -68,25 +81,53 @@ const GuestProfileSetup: FC<GuestProfileSetupProps> = ({
       // Fetch avatars from the database
       const fetchAvatars = async () => {
         setIsLoading(true);
-        const { data, error } = await supabase
-          .from("default_avatars")
-          .select("*")
-          .eq("active", true);
-        
-        if (error) {
+        try {
+          const { data, error } = await supabase
+            .from("default_avatars")
+            .select("*")
+            .eq("active", true);
+          
+          if (error) {
+            throw error;
+          }
+          
+          if (data && data.length > 0) {
+            // Filter avatars to include only those that match files we know exist
+            const validAvatars = data.filter((avatar: DefaultAvatar) => {
+              const urlParts = avatar.avatar_url.split('/');
+              const filename = urlParts.length > 0 ? urlParts[urlParts.length - 1] : '';
+              // Only include avatar1-5, monster_1-3, and default.png
+              return /^(avatar[1-5]|monster_[1-3]|default)\.png$/.test(filename);
+            });
+            
+            if (validAvatars.length > 0) {
+              setAvatars(validAvatars);
+              // Select a random avatar from valid ones
+              const randomAvatar = validAvatars[Math.floor(Math.random() * validAvatars.length)];
+              setSelectedAvatarUrl(randomAvatar.avatar_url);
+            } else {
+              // Use fallback avatars if no valid avatars
+              setAvatars(FALLBACK_AVATARS);
+              setSelectedAvatarUrl(FALLBACK_AVATARS[0].avatar_url);
+            }
+          } else {
+            // Use fallback avatars if no data
+            setAvatars(FALLBACK_AVATARS);
+            setSelectedAvatarUrl(FALLBACK_AVATARS[0].avatar_url);
+          }
+        } catch (error) {
           console.error("Error fetching avatars:", error);
           toast({
             title: "Error",
-            description: "Could not load avatars. Using default instead.",
+            description: "Could not load avatars. Using defaults instead.",
             variant: "destructive",
           });
-        } else if (data && data.length > 0) {
-          setAvatars(data);
-          // Select a random avatar
-          const randomAvatar = data[Math.floor(Math.random() * data.length)];
-          setSelectedAvatarUrl(randomAvatar.avatar_url);
+          // Use fallback avatars on error
+          setAvatars(FALLBACK_AVATARS);
+          setSelectedAvatarUrl(FALLBACK_AVATARS[0].avatar_url);
+        } finally {
+          setIsLoading(false);
         }
-        setIsLoading(false);
       };
       
       fetchAvatars();
@@ -128,7 +169,7 @@ const GuestProfileSetup: FC<GuestProfileSetupProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="text-xl">Create Your Guest Profile</DialogTitle>
           <DialogDescription>
@@ -146,6 +187,7 @@ const GuestProfileSetup: FC<GuestProfileSetupProps> = ({
               onChange={(e) => setDisplayName(e.target.value)}
               placeholder="Enter your display name"
               maxLength={30}
+              className="text-lg py-5"
             />
             <p className="text-xs text-muted-foreground">
               This is how others will see you during the cleaning session
@@ -153,11 +195,11 @@ const GuestProfileSetup: FC<GuestProfileSetupProps> = ({
           </div>
 
           {/* Avatar Selection */}
-          <div className="space-y-2">
-            <Label>Select an Avatar</Label>
+          <div className="space-y-3">
+            <Label className="text-lg">Select an Avatar</Label>
             
             {isLoading ? (
-              <div className="grid grid-cols-4 gap-2">
+              <div className="grid grid-cols-4 gap-3">
                 {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
                   <div 
                     key={n} 
@@ -166,7 +208,7 @@ const GuestProfileSetup: FC<GuestProfileSetupProps> = ({
                 ))}
               </div>
             ) : (
-              <div className="grid grid-cols-4 gap-2">
+              <div className="grid grid-cols-4 gap-3">
                 {avatars.map((avatar) => (
                   <div
                     key={avatar.id}
@@ -184,11 +226,33 @@ const GuestProfileSetup: FC<GuestProfileSetupProps> = ({
                         src={avatar.avatar_url}
                         alt={avatar.avatar_name}
                         fill
+                        sizes="(max-width: 768px) 25vw, 100px"
                         className="object-contain"
                       />
                     </div>
                   </div>
                 ))}
+                {/* Always include default avatar as a fallback */}
+                <div
+                  className={`
+                    cursor-pointer rounded-md p-1 aspect-square
+                    ${selectedAvatarUrl === "/images/avatars/default.png"
+                      ? "ring-2 ring-primary bg-primary/10"
+                      : "hover:bg-muted"
+                    }
+                  `}
+                  onClick={() => setSelectedAvatarUrl("/images/avatars/default.png")}
+                >
+                  <div className="relative w-full h-full">
+                    <Image
+                      src="/images/avatars/default.png"
+                      alt="Default Avatar"
+                      fill
+                      sizes="(max-width: 768px) 25vw, 100px"
+                      className="object-contain"
+                    />
+                  </div>
+                </div>
               </div>
             )}
             
@@ -198,7 +262,7 @@ const GuestProfileSetup: FC<GuestProfileSetupProps> = ({
           </div>
 
           <Button
-            className="w-full"
+            className="w-full text-lg py-6"
             onClick={handleContinue}
             disabled={isLoading || !displayName.trim() || !selectedAvatarUrl}
           >

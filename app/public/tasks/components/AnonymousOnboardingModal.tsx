@@ -33,80 +33,80 @@ const AnonymousOnboardingModal: FC<AnonymousOnboardingModalProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle className="text-xl">Welcome to Ward Cleaning</DialogTitle>
-          <DialogDescription>
+          <DialogTitle className="text-xl font-bold">Welcome to Ward Cleaning</DialogTitle>
+          <DialogDescription className="text-base">
             Choose how you'd like to participate in today's cleaning session
           </DialogDescription>
         </DialogHeader>
 
-        <div className="py-4">
-          <div className="flex flex-col space-y-4">
-            <div className="grid grid-cols-2 gap-4 mb-6">
-              <div className="bg-muted p-4 rounded-lg">
-                <h3 className="font-medium mb-2">Guest Mode</h3>
-                <ul className="space-y-2 text-sm">
+        <div className="py-6">
+          <div className="flex flex-col space-y-5">
+            <div className="grid grid-cols-2 gap-6 mb-6">
+              <div className="bg-muted p-5 rounded-lg">
+                <h3 className="font-medium mb-3">Guest Mode</h3>
+                <ul className="space-y-3 text-sm">
                   <li className="flex items-center">
-                    <CheckCircle2 className="h-4 w-4 text-green-600 mr-2" />
+                    <CheckCircle2 className="h-4 w-4 text-green-600 mr-3 flex-shrink-0" />
                     <span>View and claim tasks</span>
                   </li>
                   <li className="flex items-center">
-                    <CheckCircle2 className="h-4 w-4 text-green-600 mr-2" />
+                    <CheckCircle2 className="h-4 w-4 text-green-600 mr-3 flex-shrink-0" />
                     <span>Track progress</span>
                   </li>
                   <li className="flex items-center">
-                    <CheckCircle2 className="h-4 w-4 text-green-600 mr-2" />
+                    <CheckCircle2 className="h-4 w-4 text-green-600 mr-3 flex-shrink-0" />
                     <span>Collaborate with others</span>
                   </li>
                   <li className="flex items-center">
-                    <XCircle className="h-4 w-4 text-red-600 mr-2" />
+                    <XCircle className="h-4 w-4 text-red-600 mr-3 flex-shrink-0" />
                     <span className="text-muted-foreground">No cleaning calendar</span>
                   </li>
                   <li className="flex items-center">
-                    <XCircle className="h-4 w-4 text-red-600 mr-2" />
+                    <XCircle className="h-4 w-4 text-red-600 mr-3 flex-shrink-0" />
                     <span className="text-muted-foreground">No notifications</span>
                   </li>
                   <li className="flex items-center">
-                    <XCircle className="h-4 w-4 text-red-600 mr-2" />
+                    <XCircle className="h-4 w-4 text-red-600 mr-3 flex-shrink-0" />
                     <span className="text-muted-foreground">No leaderboard</span>
                   </li>
                   <li className="flex items-center">
-                    <XCircle className="h-4 w-4 text-red-600 mr-2" />
+                    <XCircle className="h-4 w-4 text-red-600 mr-3 flex-shrink-0" />
                     <span className="text-muted-foreground">Re-enter info each time</span>
                   </li>
                 </ul>
               </div>
 
-              <div className="bg-primary/5 border-primary/20 border p-4 rounded-lg">
-                <h3 className="font-medium mb-2">Signed-Up Member</h3>
-                <ul className="space-y-2 text-sm">
+              <div className="bg-primary/5 border-primary/20 border p-5 rounded-lg">
+                <h3 className="font-medium mb-3">Signed-Up Member</h3>
+                <ul className="space-y-3 text-sm">
                   <li className="flex items-center">
-                    <CheckCircle2 className="h-4 w-4 text-green-600 mr-2" />
+                    <CheckCircle2 className="h-4 w-4 text-green-600 mr-3 flex-shrink-0" />
                     <span>View and claim tasks</span>
                   </li>
                   <li className="flex items-center">
-                    <CheckCircle2 className="h-4 w-4 text-green-600 mr-2" />
+                    <CheckCircle2 className="h-4 w-4 text-green-600 mr-3 flex-shrink-0" />
                     <span>Track progress</span>
                   </li>
                   <li className="flex items-center">
-                    <CheckCircle2 className="h-4 w-4 text-green-600 mr-2" />
+                    <CheckCircle2 className="h-4 w-4 text-green-600 mr-3 flex-shrink-0" />
                     <span>Collaborate with others</span>
                   </li>
                   <li className="flex items-center">
-                    <CheckCircle2 className="h-4 w-4 text-green-600 mr-2" />
+                    <CheckCircle2 className="h-4 w-4 text-green-600 mr-3 flex-shrink-0" />
                     <span>Cleaning calendar access</span>
                   </li>
                   <li className="flex items-center">
-                    <CheckCircle2 className="h-4 w-4 text-green-600 mr-2" />
+                    <CheckCircle2 className="h-4 w-4 text-green-600 mr-3 flex-shrink-0" />
                     <span>Customizable notifications</span>
                   </li>
                   <li className="flex items-center">
-                    <CheckCircle2 className="h-4 w-4 text-green-600 mr-2" />
+                    <CheckCircle2 className="h-4 w-4 text-green-600 mr-3 flex-shrink-0" />
                     <span>Earn points and compete</span>
                   </li>
                   <li className="flex items-center">
-                    <CheckCircle2 className="h-4 w-4 text-green-600 mr-2" />
+                    <CheckCircle2 className="h-4 w-4 text-green-600 mr-3 flex-shrink-0" />
                     <span>Persistent profile</span>
                   </li>
                 </ul>
@@ -115,16 +115,16 @@ const AnonymousOnboardingModal: FC<AnonymousOnboardingModalProps> = ({
 
             <Button
               variant="default"
-              className="w-full mb-2"
+              className="w-full mb-3 py-6 text-base"
               onClick={handleSignUp}
             >
-              <User className="mr-2 h-4 w-4" />
+              <User className="mr-2 h-5 w-5" />
               Sign Up
             </Button>
             
             <Button
               variant="outline"
-              className="w-full"
+              className="w-full py-6 text-base"
               onClick={onContinueAsGuest}
             >
               Continue as Guest
