@@ -65,17 +65,12 @@ export const updateTaskWithFallback = async (
       };
     }
     
-    // Log the update attempt for debugging
-    console.log('Attempting task update:', { taskId, updateData });
-    
     // Try to update with standard client to trigger real-time events
     const { data, error } = await supabase
       .from('cleaning_session_tasks')
       .update(updateData)
       .eq('id', taskId)
       .select();
-    
-    console.log('Update result:', { data, error });
     
     if (!error) {
       return { success: true, data, error: null };
@@ -87,36 +82,4 @@ export const updateTaskWithFallback = async (
     console.error("Exception updating task:", err);
     return { success: false, data: null, error: err };
   }
-};
-
-export const debugTask = async (
-  taskId: string,
-  action: string,
-  supabase: any,
-  currentParticipant: SessionParticipant | null
-) => {
-  console.log('=== DEBUG TASK ===');
-  console.log('Action:', action);
-  console.log('Task ID:', taskId);
-  console.log('Current Participant:', currentParticipant);
-  
-  // List all policies for this table
-  const { data: policies } = await supabase
-    .rpc('get_policies_for_table', { table_name: 'cleaning_session_tasks' });
-  
-  console.log('Policies:', policies);
-  
-  // Try a simple update with minimal data
-  const updateData = { status: 'doing' };
-  console.log('Attempting update with:', updateData);
-  
-  const { data, error } = await supabase
-    .from('cleaning_session_tasks')
-    .update(updateData)
-    .eq('id', taskId)
-    .select();
-  
-  console.log('Update result:', { data, error });
-  
-  return { data, error };
 }; 

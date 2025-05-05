@@ -174,13 +174,10 @@ export const fetchWardTasksWithServiceRole = async (taskIds: string[]) => {
     // First, try a simpler approach - get tasks with full joining
     const supabase = createClient();
     
-    // Replace the join query with a more direct approach
     // Try a better approach - use a direct session_id query first to get all tasks
     const sessionId = await getSessionIdForTasks(taskIds, supabase);
 
     if (sessionId) {
-      console.log(`Found session ID ${sessionId} for the task IDs`);
-      
       // Try this more direct approach to get all task details
       const { data: sessionTasksWithDetails, error: joinError } = await supabase
         .from('cleaning_session_tasks')
@@ -198,48 +195,12 @@ export const fetchWardTasksWithServiceRole = async (taskIds: string[]) => {
         `)
         .in('task_id', taskIds);
 
-      // Add detailed debugging to inspect the response structure
-      console.log("Attempt to join cleaning_session_tasks with ward_tasks result:", 
-        joinError ? `Error: ${joinError.message}` : `Success, fetched ${sessionTasksWithDetails?.length} items`);
-
       if (!joinError && sessionTasksWithDetails && sessionTasksWithDetails.length > 0) {
         const firstItem = sessionTasksWithDetails[0];
-        console.log("Sample task structure:", {
-          item_id: firstItem.id,
-          task_id: firstItem.task_id,
-          task_type: typeof firstItem.task,
-          task_is_array: Array.isArray(firstItem.task),
-          task_keys: typeof firstItem.task === 'object' ? 
-            (firstItem.task ? Object.keys(firstItem.task) : 'null') : 'not object'
-        });
-        
-        // If task is array, log the first element structure
-        if (Array.isArray(firstItem.task) && firstItem.task.length > 0) {
-          console.log("First task array element:", {
-            sample_task_keys: Object.keys(firstItem.task[0]).slice(0, 5),
-            sample_task_title: firstItem.task[0].title
-          });
-        } 
-        // If task is object, log some sample values
-        else if (typeof firstItem.task === 'object' && firstItem.task !== null) {
-          console.log("Task object sample:", {
-            sample_keys: Object.keys(firstItem.task).slice(0, 5),
-            sample_title: firstItem.task.title
-          });
-        }
         
         // Properly handle the way Supabase returns joined data
         // Check if task data is present by examining the first result
         const hasTaskData = firstItem.task !== null;
-        
-        console.log("First join result task data:", 
-          hasTaskData ? 
-          (Array.isArray(firstItem.task) ? 
-            `Array with ${firstItem.task.length} items` : 
-            (typeof firstItem.task === 'object' ? 
-              `Object with keys: ${Object.keys(firstItem.task).join(', ')}` : 
-              `Unexpected type: ${typeof firstItem.task}`)) : 
-          "No task data");
         
         if (hasTaskData) {
           // Map the session tasks to their ward tasks
@@ -274,15 +235,11 @@ export const fetchWardTasksWithServiceRole = async (taskIds: string[]) => {
           
           // Check if we extracted any valid tasks
           if (formattedTasks.length > 0) {
-            console.log(`Successfully extracted ${formattedTasks.length} tasks from join result`);
-            
             // Check if we're missing any tasks
             const fetchedIds = new Set(formattedTasks.map((task: WardTask) => task.id));
             const missingTaskIds = taskIds.filter(id => !fetchedIds.has(id));
             
             if (missingTaskIds.length > 0) {
-              console.log(`Join approach missing ${missingTaskIds.length} tasks, creating placeholders for those`);
-              
               // Create placeholders for the missing tasks
               const placeholders = missingTaskIds.map(id => createPlaceholderTask(id));
               return { data: [...formattedTasks, ...placeholders], error: null };
@@ -291,13 +248,10 @@ export const fetchWardTasksWithServiceRole = async (taskIds: string[]) => {
             return { data: formattedTasks, error: null };
           }
         }
-        
-        console.log("Join approached failed to extract task data");
       }
     }
     
     // If the join approach failed, try the direct approach
-    console.log("Join approach failed, trying direct ward_tasks fetch");
     const { data: directTasks, error: directError } = await supabase
       .from('ward_tasks')
       .select('*')
@@ -318,7 +272,6 @@ export const fetchWardTasksWithServiceRole = async (taskIds: string[]) => {
     }
     
     // Last resort - try to fetch tasks one by one
-    console.log("Both approaches failed, trying individual task fetches");
     const fetchedTasks: WardTask[] = [];
     const fetchPromises = taskIds.map(async (id) => {
       const { data: taskData, error: taskError } = await supabase

@@ -186,14 +186,6 @@ export default function AnonymousTasksPage() {
         
         if (taskDetailsError) throw taskDetailsError;
         
-        // Add these debug logs
-        console.log(`Fetched ${taskDetails?.length || 0} task details:`, 
-          taskDetails ? taskDetails.slice(0, 2).map((t: any) => ({
-            id: t.id,
-            title: t.title,
-            instructions: t.instructions ? (t.instructions.substring(0, 20) + '...') : 'No instructions'
-          })) : 'No details');
-        
         // Create a map for quick lookup
         const taskDetailsMap: Record<string, any> = {};
         if (taskDetails) {
@@ -208,8 +200,6 @@ export default function AnonymousTasksPage() {
         const fullTasks = (sessionTasks as any[]).map((sessionTask) => {
           const taskDetail = taskDetailsMap[sessionTask.task_id];
           if (!taskDetail) {
-            console.warn(`Missing task details for task_id ${sessionTask.task_id}`);
-            
             // Create a placeholder task record with basic info
             return {
               ...sessionTask,
@@ -230,8 +220,6 @@ export default function AnonymousTasksPage() {
           };
         }) as SessionTask[];
         
-        console.log(`Successfully processed ${fullTasks.length} of ${sessionTasks.length} tasks`);
-
         // Fetch participants
         const { data: participantsData, error: participantsError } = await supabase
           .from("session_participants")
