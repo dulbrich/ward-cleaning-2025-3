@@ -9,7 +9,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { createClient } from "@/utils/supabase/client";
-import { Columns, List, Share2, Star, User, Users } from "lucide-react";
+import { Columns, List, Share2, Star, User } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import Confetti from "react-confetti";
@@ -79,6 +79,13 @@ interface SessionParticipant {
   avatar_url?: string; // This is added dynamically after fetching from the database
 }
 
+interface ParticipantWithProfile extends SessionParticipant {
+  user_profile?: {
+    username?: string;
+    avatar_url?: string;
+  }
+}
+
 interface TaskViewer {
   id: string;
   session_task_id: string;
@@ -102,12 +109,13 @@ export default function TasksPage() {
   const [showTaskDetail, setShowTaskDetail] = useState(false);
   const [showShareDialog, setShowShareDialog] = useState(false);
   const [showSignUpPrompt, setShowSignUpPrompt] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [currentParticipant, setCurrentParticipant] = useState<SessionParticipant | null>(null);
   const [showConfetti, setShowConfetti] = useState(false);
-  const [cleaningUp, setCleaningUp] = useState(false);
+  const [tasks, setTasks] = useState<SessionTask[]>([]);
+  const [viewers, setViewers] = useState<ParticipantWithProfile[]>([]);
   // Add a ref to always have the latest participants
   const participantsRef = useRef<SessionParticipant[]>(participants);
   // Add refs for currentUserId and currentParticipant
@@ -187,7 +195,7 @@ export default function TasksPage() {
   // Fetch upcoming session if no sessionId is provided or fetch the specific session
   useEffect(() => {
     const fetchSession = async () => {
-      setLoading(true);
+      setIsLoading(true);
       
       try {
         let sessionData;
@@ -238,7 +246,7 @@ export default function TasksPage() {
               
               if (!user) {
                 toast.error("Please sign in to create a cleaning session");
-                setLoading(false);
+                setIsLoading(false);
                 return;
               }
               
@@ -349,7 +357,7 @@ export default function TasksPage() {
         console.error("Error fetching/creating session data:", error);
         toast.error("Failed to load or create session data");
       } finally {
-        setLoading(false);
+        setIsLoading(false);
       }
     };
     
@@ -833,49 +841,7 @@ export default function TasksPage() {
     });
   };
 
-  // Clean up duplicate task viewers
-  const cleanupDuplicateViewers = useCallback(async () => {
-    try {
-      setCleaningUp(true);
-      const response = await fetch('/api/realtime-status?fix_duplicates=true');
-      const result = await response.json();
-      
-      if (result.duplicateCleanupResult && result.duplicateCleanupResult.success) {
-        const removed = result.duplicateCleanupResult.totalDuplicatesRemoved;
-        if (removed > 0) {
-          toast.success(`Cleaned up ${removed} duplicate viewer records`);
-        } else {
-          toast.info("No duplicate viewers found");
-        }
-      } else {
-        toast.error("Failed to clean up duplicate viewers");
-        console.error("Cleanup error:", result.duplicateCleanupResult?.error);
-      }
-    } catch (error) {
-      console.error("Error cleaning up duplicate viewers:", error);
-      toast.error("An error occurred while cleaning up viewers");
-    } finally {
-      setCleaningUp(false);
-    }
-  }, []);
-
-  // Clear all task viewers when unmounting
-  useEffect(() => {
-    return () => {
-      // Clean up any task viewers when component unmounts
-      if (currentParticipant) {
-        supabase
-          .from("task_viewers")
-          .delete()
-          .eq("participant_id", currentParticipant.id)
-          .then(({ error }: { error: any }) => {
-            if (error) console.error("Error cleaning up task viewers on unmount:", error);
-          });
-      }
-    };
-  }, [supabase, currentParticipant]);
-
-  if (!session && !loading) {
+  if (!session && !isLoading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[70vh]">
         <h1 className="text-2xl font-bold mb-4">No Cleaning Sessions Found</h1>
@@ -894,7 +860,7 @@ export default function TasksPage() {
     );
   }
   
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="space-y-6 p-4">
         <div className="flex justify-between items-center">
@@ -952,18 +918,6 @@ export default function TasksPage() {
             <Button variant="outline" size="icon" onClick={() => setShowShareDialog(true)}>
               <Share2 size={16} />
             </Button>
-            
-            {isAuthenticated && (
-              <Button 
-                variant="outline" 
-                size="icon" 
-                onClick={cleanupDuplicateViewers} 
-                disabled={cleaningUp}
-                title="Clean up duplicate viewers"
-              >
-                <Users size={16} />
-              </Button>
-            )}
           </div>
         </div>
         
