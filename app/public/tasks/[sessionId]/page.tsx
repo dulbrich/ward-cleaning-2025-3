@@ -1,13 +1,14 @@
 "use client";
 
 import { Skeleton } from "@/components/ui/skeleton";
-import { useToast } from "@/components/ui/use-toast";
 import { createClient } from "@/utils/supabase/client";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
+import { useToast } from "../../../../components/ui/use-toast";
 
 import AnonymousOnboardingModal from "../components/AnonymousOnboardingModal";
 import AnonymousTasksLayout from "../components/AnonymousTasksLayout";
+import GuestLimitationsTooltip from "../components/GuestLimitationsTooltip";
 import GuestProfileSetup from "../components/GuestProfileSetup";
 import SessionQRCode from "../components/SessionQRCode";
 
@@ -15,12 +16,57 @@ import SessionQRCode from "../components/SessionQRCode";
 import TaskCard from "@/app/app/tasks/components/TaskCard";
 import TaskDetail from "@/app/app/tasks/components/TaskDetail";
 
-// Reuse types from main app tasks
-import type {
-    CleaningSession,
-    SessionParticipant,
-    SessionTask,
-} from "@/app/app/tasks/types";
+// Define types locally instead of importing from main app
+interface WardTask {
+  id: string;
+  title: string;
+  subtitle?: string;
+  instructions: string;
+  equipment: string;
+  safety?: string;
+  color?: string;
+  priority?: string;
+  kid_friendly?: boolean;
+  points?: number;
+}
+
+interface SessionTask {
+  id: string;
+  session_id: string;
+  task_id: string;
+  status: "todo" | "doing" | "done";
+  assigned_to?: string;
+  assigned_to_temp_user?: string;
+  assigned_at?: string;
+  completed_at?: string;
+  points_awarded?: number;
+  task: WardTask;
+  assignee?: {
+    display_name: string;
+    avatar_url?: string;
+  };
+}
+
+interface CleaningSession {
+  id: string;
+  session_name: string;
+  session_date: string;
+  status: string;
+  created_by: string;
+  public_access_code: string;
+  completed_at?: string;
+}
+
+interface SessionParticipant {
+  id: string;
+  session_id: string;
+  user_id?: string;
+  temp_user_id?: string;
+  display_name: string;
+  is_authenticated: boolean;
+  last_active_at: string;
+  avatar_url?: string;
+}
 
 export default function AnonymousTasksPage() {
   const router = useRouter();
@@ -146,8 +192,8 @@ export default function AnonymousTasksPage() {
             
             toast({
               title: "Welcome back!",
-              description: `You're back as ${existingParticipant.display_name}`,
-              duration: 3000,
+              description: `You're back as ${existingParticipant.display_name}. Your progress has been saved.`,
+              duration: 5000,
             });
           } else {
             // Temp user not found in database, show profile setup
@@ -385,6 +431,47 @@ export default function AnonymousTasksPage() {
             </p>
           </div>
         </div>
+        
+        {/* Guest Features Section */}
+        {currentParticipant && !currentParticipant.is_authenticated && (
+          <div className="bg-muted/30 rounded-lg p-4 mb-6">
+            <h2 className="text-sm font-medium mb-2">Guest Features</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
+              <div className="flex items-center">
+                <span className="bg-green-100 text-green-800 rounded-full p-1 mr-2">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M20 6 9 17l-5-5" />
+                  </svg>
+                </span>
+                <span>View and claim tasks</span>
+              </div>
+              
+              <div className="flex items-center">
+                <GuestLimitationsTooltip sessionId={sessionId} feature="calendar">
+                  <span className="bg-red-100 text-red-800 rounded-full p-1 mr-2">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M18 6 6 18" />
+                      <path d="m6 6 12 12" />
+                    </svg>
+                  </span>
+                  <span className="text-muted-foreground">Cleaning calendar</span>
+                </GuestLimitationsTooltip>
+              </div>
+              
+              <div className="flex items-center">
+                <GuestLimitationsTooltip sessionId={sessionId} feature="leaderboard">
+                  <span className="bg-red-100 text-red-800 rounded-full p-1 mr-2">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M18 6 6 18" />
+                      <path d="m6 6 12 12" />
+                    </svg>
+                  </span>
+                  <span className="text-muted-foreground">Earn points</span>
+                </GuestLimitationsTooltip>
+              </div>
+            </div>
+          </div>
+        )}
         
         {/* My Tasks Section */}
         {currentParticipant && myTasks.length > 0 && (

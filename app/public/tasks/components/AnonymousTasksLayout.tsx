@@ -2,9 +2,11 @@
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { User } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { HelpCircle, User } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { FC, ReactNode } from "react";
+import ScrollToTopButton from "./ScrollToTopButton";
 
 interface AnonymousTasksLayoutProps {
   children: ReactNode;
@@ -27,9 +29,19 @@ const AnonymousTasksLayout: FC<AnonymousTasksLayoutProps> = ({
           <div className="flex items-center space-x-4">
             <h1 className="font-bold text-xl">Ward Cleaning</h1>
             {isAnonymous && (
-              <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">
-                Guest Mode
-              </Badge>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 flex items-center gap-1 cursor-help">
+                      Guest Mode
+                      <HelpCircle className="h-3 w-3" />
+                    </Badge>
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs">
+                    <p>You're participating as a guest. Create an account to access features like notifications, leaderboard, and save your profile.</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             )}
           </div>
           <div>
@@ -70,6 +82,9 @@ const AnonymousTasksLayout: FC<AnonymousTasksLayoutProps> = ({
           </div>
         </div>
       )}
+
+      {/* Scroll to top button */}
+      <ScrollToTopButton />
     </div>
   );
 };
