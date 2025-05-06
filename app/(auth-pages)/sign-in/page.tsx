@@ -16,6 +16,9 @@ function SignInContent() {
   const searchParams = useSearchParams();
   const message = searchParams?.get("message");
   const type = searchParams?.get("type");
+  const sessionId = searchParams?.get("sessionId");
+  const tempUserId = searchParams?.get("tempUserId");
+  const returnUrl = searchParams?.get("returnUrl");
   
   return (
     <div className="flex-1 flex flex-col w-full px-8 sm:max-w-md justify-center gap-2">
@@ -80,6 +83,9 @@ function SignInContent() {
           placeholder="••••••••"
           required
         />
+        <input type="hidden" name="origin" value={returnUrl || '/'} />
+        {sessionId && <input type="hidden" name="sessionId" value={sessionId} />}
+        {tempUserId && <input type="hidden" name="tempUserId" value={tempUserId} />}
         <Button className="mb-2">Sign In</Button>
         <div className="text-center text-sm mt-4">
           <Link
@@ -88,6 +94,19 @@ function SignInContent() {
           >
             Forgot your password?
           </Link>
+          <div className="mt-2">
+            Don't have an account?{" "}
+            <Link
+              href={`/sign-up${searchParams ? `?${new URLSearchParams({
+                sessionId: sessionId || '',
+                tempUserId: tempUserId || '',
+                returnUrl: returnUrl || '/'
+              }).toString()}` : ''}`}
+              className="underline underline-offset-4 hover:text-primary text-sm"
+            >
+              Sign Up
+            </Link>
+          </div>
         </div>
       </form>
     </div>

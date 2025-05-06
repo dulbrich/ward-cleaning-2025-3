@@ -9,6 +9,10 @@ export async function GET(request: Request) {
   const code = requestUrl.searchParams.get("code");
   const origin = requestUrl.origin;
   const redirectTo = requestUrl.searchParams.get("redirect_to")?.toString();
+  
+  // Get session context if coming from cleaning session
+  const sessionId = requestUrl.searchParams.get("sessionId");
+  const tempUserId = requestUrl.searchParams.get("tempUserId");
 
   if (code) {
     const supabase = await createClient();
@@ -19,7 +23,17 @@ export async function GET(request: Request) {
     return NextResponse.redirect(`${origin}${redirectTo}`);
   }
 
+  // Build onboarding URL with session context if available
+  let onboardingUrl = `${origin}/onboarding?type=success&message=Email verified successfully. Please complete your profile.`;
+  
+  if (sessionId) {
+    onboardingUrl += `&sessionId=${sessionId}`;
+    if (tempUserId) {
+      onboardingUrl += `&tempUserId=${tempUserId}`;
+    }
+  }
+
   // URL to redirect to after sign up process completes - direct to onboarding
   // Include a message for the user that email verification was successful
-  return NextResponse.redirect(`${origin}/onboarding?type=success&message=Email verified successfully. Please complete your profile.`);
+  return NextResponse.redirect(onboardingUrl);
 }

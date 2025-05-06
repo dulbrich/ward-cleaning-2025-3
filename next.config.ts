@@ -48,6 +48,12 @@ const nextConfig: NextConfig = {
         source: '/sign-up',
         destination: '/coming-soon',
         permanent: false,
+        missing: [
+          {
+            type: 'query',
+            key: 'sessionId',
+          }
+        ],
       },
     ];
   },

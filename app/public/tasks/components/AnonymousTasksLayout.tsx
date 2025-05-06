@@ -21,6 +21,24 @@ const AnonymousTasksLayout: FC<AnonymousTasksLayoutProps> = ({
 }) => {
   const router = useRouter();
 
+  // Helper function to create sign up URL with session context
+  const getSignUpUrl = () => {
+    // Get the temp user ID from localStorage if exists
+    const tempUserId = localStorage.getItem(`tempUserId_${sessionId}`);
+    
+    // Build URL parameters
+    const params = new URLSearchParams();
+    params.append('returnUrl', `/tasks?sessionId=${sessionId}`);
+    params.append('sessionId', sessionId);
+    
+    // Only append tempUserId if it exists
+    if (tempUserId) {
+      params.append('tempUserId', tempUserId);
+    }
+    
+    return `/sign-up?${params.toString()}`;
+  };
+
   return (
     <div className="min-h-screen bg-background">
       {/* Minimal header with guest mode indicator */}
@@ -47,7 +65,7 @@ const AnonymousTasksLayout: FC<AnonymousTasksLayoutProps> = ({
           <div>
             {isAnonymous && (
               <Button 
-                onClick={() => router.push(`/login?returnUrl=${encodeURIComponent(`/tasks?sessionId=${sessionId}`)}`)}
+                onClick={() => router.push(getSignUpUrl())}
                 className="shadow-sm"
                 variant="default"
               >
@@ -69,7 +87,7 @@ const AnonymousTasksLayout: FC<AnonymousTasksLayoutProps> = ({
         <div className="fixed bottom-6 right-6">
           <div className="flex flex-col gap-2">
             <Button 
-              onClick={() => router.push(`/login?returnUrl=${encodeURIComponent(`/tasks?sessionId=${sessionId}`)}`)}
+              onClick={() => router.push(getSignUpUrl())}
               size="lg"
               className="shadow-lg bg-primary/90 hover:bg-primary transition-all"
             >

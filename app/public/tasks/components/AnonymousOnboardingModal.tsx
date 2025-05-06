@@ -2,15 +2,15 @@
 
 import { Button } from "@/components/ui/button";
 import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogHeader,
-    DialogTitle,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
 } from "@/components/ui/dialog";
 import { CheckCircle2, User, XCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { FC } from "react";
+import { FC, useEffect, useState } from "react";
 
 interface AnonymousOnboardingModalProps {
   isOpen: boolean;
@@ -26,9 +26,28 @@ const AnonymousOnboardingModal: FC<AnonymousOnboardingModalProps> = ({
   onContinueAsGuest,
 }) => {
   const router = useRouter();
+  const [tempUserId, setTempUserId] = useState<string | null>(null);
+  
+  // Get the temp user ID from localStorage if exists
+  useEffect(() => {
+    if (sessionId) {
+      const storedTempUserId = localStorage.getItem(`tempUserId_${sessionId}`);
+      setTempUserId(storedTempUserId);
+    }
+  }, [sessionId]);
 
   const handleSignUp = () => {
-    router.push(`/login?returnUrl=${encodeURIComponent(`/tasks?sessionId=${sessionId}`)}`);
+    // Modify to include session ID and temp user ID in the URL parameters
+    const params = new URLSearchParams();
+    params.append('returnUrl', `/tasks?sessionId=${sessionId}`);
+    params.append('sessionId', sessionId);
+    
+    // Only append tempUserId if it exists
+    if (tempUserId) {
+      params.append('tempUserId', tempUserId);
+    }
+    
+    router.push(`/sign-up?${params.toString()}`);
   };
 
   return (

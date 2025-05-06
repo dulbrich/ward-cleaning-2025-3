@@ -206,6 +206,12 @@ const redirectWithMessage = (url: string) => {
 export const signInAction = async (formData: FormData) => {
   const email = formData.get("email") as string;
   const password = formData.get("password") as string;
+  const origin = formData.get("origin") as string || "/app";
+  
+  // Get session context if coming from cleaning session
+  const sessionId = formData.get("sessionId") as string;
+  const tempUserId = formData.get("tempUserId") as string;
+  
   const supabase = await createClient();
 
   const { error, data } = await supabase.auth.signInWithPassword({
@@ -214,7 +220,21 @@ export const signInAction = async (formData: FormData) => {
   });
 
   if (error) {
-    redirectWithMessage(encodedRedirect("error", "/sign-in", error.message));
+    // Build error URL with context preservation
+    const errorUrl = new URL("/sign-in", getBaseUrl());
+    errorUrl.searchParams.set("type", "error");
+    errorUrl.searchParams.set("message", error.message);
+    if (sessionId) {
+      errorUrl.searchParams.set("sessionId", sessionId);
+      if (tempUserId) {
+        errorUrl.searchParams.set("tempUserId", tempUserId);
+      }
+    }
+    if (origin) {
+      errorUrl.searchParams.set("returnUrl", origin);
+    }
+    
+    redirectWithMessage(errorUrl.toString());
     return; // This won't be reached but satisfies TypeScript
   }
   
@@ -228,12 +248,86 @@ export const signInAction = async (formData: FormData) => {
   // If no profile exists or there was an error finding it (except "not found" error)
   if (!profileData || (profileError && profileError.code !== "PGRST116")) {
     console.log("User needs onboarding. Redirecting to onboarding page.");
+    
+    // Build onboarding URL with context preservation
+    const onboardingUrl = new URL("/onboarding", getBaseUrl());
+    if (sessionId) {
+      onboardingUrl.searchParams.set("sessionId", sessionId);
+      if (tempUserId) {
+        onboardingUrl.searchParams.set("tempUserId", tempUserId);
+      }
+    }
+    
     // Redirect to onboarding instead of protected page
-    return redirect("/onboarding");
+    return redirect(onboardingUrl.toString());
   }
 
-  return redirect("/app");
+  // Handle session context for users with profiles
+  if (sessionId) {
+    try {
+      // If the user is coming from a cleaning session and has a profile:
+      // 1. Verify the ward association
+      // 2. Transfer any anonymous activity if there was a temp user
+      
+      // Get session's ward branch ID
+      const { data: sessionData, error: sessionError } = await supabase
+        .from('cleaning_sessions')
+        .select('ward_branch_id')
+        .eq('id', sessionId)
+        .single();
+        
+      if (sessionError) {
+        console.error("Error fetching session for ward association:", sessionError);
+      } else if (sessionData?.ward_branch_id) {
+        // Check if ward association exists, create if not
+        const { data: membershipData, error: membershipError } = await supabase
+          .from('ward_branch_members')
+          .select('id')
+          .eq('user_id', data.user.id)
+          .eq('ward_branch_id', sessionData.ward_branch_id)
+          .maybeSingle();
+          
+        if (membershipError) {
+          console.error("Error checking ward membership:", membershipError);
+        } else if (!membershipData) {
+          // Create membership if it doesn't exist
+          await supabase.rpc('associate_user_with_ward', {
+            p_user_id: data.user.id,
+            p_ward_branch_id: sessionData.ward_branch_id,
+            p_role: 'member'
+          });
+        }
+        
+        // Transfer anonymous activity if tempUserId exists
+        if (tempUserId) {
+          await supabase.rpc('transfer_anonymous_activity', {
+            p_temp_user_id: tempUserId,
+            p_user_id: data.user.id,
+            p_session_id: sessionId
+          });
+        }
+      }
+    } catch (sessionContextError) {
+      console.error("Error handling session context:", sessionContextError);
+      // Continue with the login flow even if this fails
+    }
+    
+    // Redirect to the session page
+    return redirect(`/app/tasks?sessionId=${sessionId}`);
+  }
+
+  // Default redirect to the app home
+  return redirect(origin || "/app");
 };
+
+// Helper function to get base URL for constructing URLs
+function getBaseUrl() {
+  if (typeof window !== 'undefined') {
+    return window.location.origin;
+  }
+  // Server-side fallback
+  return process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+}
 
 export const forgotPasswordAction = async (formData: FormData) => {
   const email = formData.get("email")?.toString();

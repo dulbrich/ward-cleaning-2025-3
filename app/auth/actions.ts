@@ -11,6 +11,10 @@ export async function signUp(formData: FormData) {
   const firstName = formData.get("firstName") as string;
   const lastName = formData.get("lastName") as string;
   const phoneNumber = formData.get("phoneNumber") as string;
+  
+  // Get session context if coming from cleaning session
+  const sessionId = formData.get("sessionId") as string;
+  const tempUserId = formData.get("tempUserId") as string;
 
   const supabase = await createClient();
 
@@ -18,7 +22,7 @@ export async function signUp(formData: FormData) {
     email,
     password,
     options: {
-      emailRedirectTo: `${origin}/auth/callback`,
+      emailRedirectTo: `${origin}/auth/callback${sessionId ? `?sessionId=${sessionId}${tempUserId ? `&tempUserId=${tempUserId}` : ''}` : ''}`,
       data: {
         first_name: firstName,
         last_name: lastName,
@@ -79,6 +83,46 @@ export async function signUp(formData: FormData) {
             import_count: 0,
             unit_number: ''
           }]);
+      }
+      
+      // If signing up from a cleaning session, create ward association
+      if (sessionId) {
+        try {
+          // Get the ward info from the session
+          const { data: sessionData, error: sessionError } = await supabase
+            .from('cleaning_sessions')
+            .select('ward_branch_id')
+            .eq('id', sessionId)
+            .single();
+            
+          if (sessionError) {
+            console.error("Error fetching session data for ward association:", sessionError);
+          } else if (sessionData?.ward_branch_id) {
+            // Create ward association using the function created in Phase 1
+            const { data: membershipData, error: membershipError } = await supabase
+              .rpc('associate_user_with_ward', {
+                p_user_id: signUpData.user.id,
+                p_ward_branch_id: sessionData.ward_branch_id,
+                p_role: 'member'
+              });
+              
+            if (membershipError) {
+              console.error("Error creating ward association:", membershipError);
+            } else {
+              console.log("Ward association created successfully:", membershipData);
+            }
+            
+            // If there's a temp user ID, prepare to transfer anonymous activity
+            if (tempUserId) {
+              // Store the temp user ID to be processed after email verification
+              // We'll store this in a temporary table or local storage to be processed
+              // when the user completes email verification
+              console.log("Temp user activity will be transferred after email verification:", tempUserId);
+            }
+          }
+        } catch (wardError) {
+          console.error("Exception during ward association:", wardError);
+        }
       }
     } catch (err) {
       console.error("Error updating user hash during signup:", err);

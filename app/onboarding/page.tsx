@@ -33,13 +33,34 @@ function OnboardingContent() {
     hasAcceptedTerms: false
   });
 
+  // Add session context to the state
+  const [sessionContext, setSessionContext] = useState<{
+    sessionId: string | null;
+    tempUserId: string | null;
+  }>({
+    sessionId: null,
+    tempUserId: null
+  });
+
   // Handle search params for success message from email verification
   useEffect(() => {
-    const messageType = searchParams.get('type');
-    const messageContent = searchParams.get('message');
-    
-    if (messageType === 'success' && messageContent) {
-      setSuccess(messageContent);
+    if (searchParams) {
+      const messageType = searchParams.get('type');
+      const messageContent = searchParams.get('message');
+      const sessionId = searchParams.get('sessionId');
+      const tempUserId = searchParams.get('tempUserId');
+      
+      if (messageType === 'success' && messageContent) {
+        setSuccess(messageContent);
+      }
+      
+      // Set session context if available
+      if (sessionId) {
+        setSessionContext({
+          sessionId,
+          tempUserId
+        });
+      }
     }
   }, [searchParams]);
 
@@ -178,13 +199,19 @@ function OnboardingContent() {
     setSuccess(null);
     
     try {
+      // Create the request body with session context
+      const requestBody = {
+        ...formData,
+        sessionContext: sessionContext.sessionId ? sessionContext : undefined
+      };
+      
       // Send to the API
       const response = await fetch('/api/user-profile/create', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(requestBody),
       });
       
       if (!response.ok) {
@@ -195,14 +222,18 @@ function OnboardingContent() {
       setSuccess('Profile created successfully!');
       setCurrentStep("success");
       
-      // Redirect to protected page after a short delay
+      // Redirect to the appropriate page based on session context
       setTimeout(() => {
-        router.push('/app');
+        if (sessionContext.sessionId) {
+          // Redirect back to the cleaning session
+          router.push(`/app/tasks?sessionId=${sessionContext.sessionId}`);
+        } else {
+          // Default redirect to the app home
+          router.push('/app');
+        }
       }, 1500);
-      
     } catch (err: any) {
       setError(err.message || 'An error occurred');
-    } finally {
       setLoading(false);
     }
   };

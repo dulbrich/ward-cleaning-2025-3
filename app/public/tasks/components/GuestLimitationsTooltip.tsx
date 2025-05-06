@@ -30,7 +30,20 @@ const GuestLimitationsTooltip: FC<GuestLimitationsTooltipProps> = ({
   const router = useRouter();
   
   const handleSignUp = () => {
-    router.push(`/login?returnUrl=${encodeURIComponent(`/tasks?sessionId=${sessionId}`)}`);
+    // Get the temp user ID from localStorage if exists
+    const tempUserId = localStorage.getItem(`tempUserId_${sessionId}`);
+    
+    // Build URL parameters
+    const params = new URLSearchParams();
+    params.append('returnUrl', `/tasks?sessionId=${sessionId}`);
+    params.append('sessionId', sessionId);
+    
+    // Only append tempUserId if it exists
+    if (tempUserId) {
+      params.append('tempUserId', tempUserId);
+    }
+    
+    router.push(`/sign-up?${params.toString()}`);
   };
   
   return (
