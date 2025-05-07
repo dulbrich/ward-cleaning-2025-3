@@ -12,6 +12,9 @@ export const signUpAction = async (formData: FormData): Promise<string> => {
   const firstName = formData.get("firstName")?.toString();
   const lastName = formData.get("lastName")?.toString();
   const phoneNumber = formData.get("phoneNumber")?.toString();
+  const sessionId = formData.get("sessionId")?.toString();
+  const tempUserId = formData.get("tempUserId")?.toString();
+  const returnUrl = formData.get("returnUrl")?.toString();
   const supabase = await createClient();
   const origin = (await headers()).get("origin");
 
@@ -40,6 +43,9 @@ export const signUpAction = async (formData: FormData): Promise<string> => {
         first_name: firstName,
         last_name: lastName,
         phone_number: phoneNumber,
+        session_id: sessionId,
+        temp_user_id: tempUserId,
+        return_url: returnUrl
       },
     },
   });
@@ -107,23 +113,64 @@ export const signUpAction = async (formData: FormData): Promise<string> => {
             unit_number: ''
           }]);
       }
+      
+      // If there's a session ID, try to associate the user with the ward
+      if (sessionId) {
+        try {
+          // Get the ward ID from the session
+          const { data: sessionData, error: sessionError } = await supabase
+            .from('cleaning_sessions')
+            .select('ward_branch_id')
+            .eq('id', sessionId)
+            .single();
+            
+          if (sessionError) {
+            console.error("Error fetching session for ward association:", sessionError);
+          } else if (sessionData?.ward_branch_id) {
+            // Associate the user with the ward
+            await supabase.rpc('associate_user_with_ward', {
+              p_user_id: data.user.id,
+              p_ward_branch_id: sessionData.ward_branch_id,
+              p_role: 'member'
+            });
+          }
+        } catch (wardAssocError) {
+          console.error("Error associating user with ward:", wardAssocError);
+          // Don't fail registration if ward association fails
+        }
+      }
     } catch (err) {
       console.error("Error updating user hash during signup:", err);
       // Don't fail registration if hash handling fails
     }
     
-    return encodedRedirect(
-      "success",
-      "/sign-up",
-      "Thanks for signing up! Please check your email for a verification link.",
-    );
+    // Create success URL with session context
+    const successUrl = new URL("/sign-up", getBaseUrl());
+    successUrl.searchParams.set("type", "success");
+    successUrl.searchParams.set("message", "Thanks for signing up! Please check your email for a verification link.");
+    
+    if (sessionId) {
+      successUrl.searchParams.set("sessionId", sessionId);
+      if (tempUserId) {
+        successUrl.searchParams.set("tempUserId", tempUserId);
+      }
+    }
+    
+    return successUrl.toString();
   } else {
-    // Handle the case where signup succeeded but no user data was returned
-    return encodedRedirect(
-      "success",
-      "/sign-up",
-      "Thanks for signing up! Please check your email for a verification link.",
-    );
+    // Create success URL with session context
+    const successUrl = new URL("/sign-up", getBaseUrl());
+    successUrl.searchParams.set("type", "success");
+    successUrl.searchParams.set("message", "Thanks for signing up! Please check your email for a verification link.");
+    
+    if (sessionId) {
+      successUrl.searchParams.set("sessionId", sessionId);
+      if (tempUserId) {
+        successUrl.searchParams.set("tempUserId", tempUserId);
+      }
+    }
+    
+    return successUrl.toString();
   }
 };
 

@@ -93,6 +93,17 @@ function SignUpContent() {
         <div className="bg-green-50 p-4 rounded-md border border-green-200 my-8">
           <h2 className="font-semibold text-green-800 text-lg mb-2">Success!</h2>
           <p className="text-green-700">{message}</p>
+          {sessionId && (
+            <div className="mt-3 p-3 bg-blue-50 rounded-md border border-blue-100">
+              <h3 className="font-medium text-blue-800 text-base mb-1">Ward Cleaning Session</h3>
+              <p className="text-blue-700 text-sm mb-2">
+                You've been added to the ward associated with this cleaning session.
+              </p>
+              <p className="text-blue-700 text-sm">
+                After verifying your email, you'll be able to view and participate in cleaning tasks.
+              </p>
+            </div>
+          )}
           <Button asChild className="mt-4">
             <Link href="/sign-in">Sign In</Link>
           </Button>

@@ -561,8 +561,23 @@ function OnboardingContent() {
         <p className="text-muted-foreground">
           Your profile has been successfully created.
         </p>
-        <p className="text-muted-foreground">
-          Redirecting you to the dashboard...
+        
+        {sessionContext.sessionId && (
+          <div className="mt-2 p-4 bg-blue-50 rounded-md border border-blue-100 text-left">
+            <h3 className="font-medium text-blue-800 text-base mb-2 text-center">Ward Membership</h3>
+            <p className="text-blue-700 text-sm mb-2">
+              You've been added to the ward associated with the cleaning session.
+            </p>
+            <p className="text-blue-700 text-sm">
+              You'll be redirected back to the cleaning tasks momentarily.
+            </p>
+          </div>
+        )}
+        
+        <p className="text-muted-foreground mt-2">
+          {sessionContext.sessionId 
+            ? "Redirecting you to the cleaning session..." 
+            : "Redirecting you to the dashboard..."}
         </p>
       </div>
     );

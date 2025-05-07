@@ -86,6 +86,11 @@ function SignInContent() {
         <input type="hidden" name="origin" value={returnUrl || '/'} />
         {sessionId && <input type="hidden" name="sessionId" value={sessionId} />}
         {tempUserId && <input type="hidden" name="tempUserId" value={tempUserId} />}
+        {sessionId && returnUrl && returnUrl.includes('sessionId') && (
+          <div className="mb-4 p-3 bg-blue-50 rounded-md text-sm text-blue-700 border border-blue-100">
+            <p>You're signing in from a ward cleaning session. After signing in, you'll be redirected back to your tasks.</p>
+          </div>
+        )}
         <Button className="mb-2">Sign In</Button>
         <div className="text-center text-sm mt-4">
           <Link
