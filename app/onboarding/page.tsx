@@ -2,6 +2,7 @@
 
 export const dynamic = 'force-dynamic';
 
+import { WardSelectionDropdown } from "@/app/components/WardSelectionDropdown";
 import { FormMessage } from "@/components/form-message";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -30,7 +31,8 @@ function OnboardingContent() {
     avatarUrl: "/images/avatars/avatar1.png",
     phoneNumber: "",
     isPhoneVerified: false,
-    hasAcceptedTerms: false
+    hasAcceptedTerms: false,
+    wardBranchId: "" // Add ward branch ID to form data
   });
 
   // Add session context to the state
@@ -174,9 +176,20 @@ function OnboardingContent() {
         setError("Please verify your phone number before proceeding.");
         return;
       }
+      // If coming from a session, skip ward selection since the user 
+      // will be automatically associated with that ward
+      if (sessionContext.sessionId) {
+        setCurrentStep("terms");
+      } else {
+        setCurrentStep("ward");
+      }
+      setError(null);
+    }
+    else if (currentStep === "ward") {
+      // Ward selection is optional, so no validation required
       setCurrentStep("terms");
       setError(null);
-    } 
+    }
     else if (currentStep === "terms") {
       if (!formData.hasAcceptedTerms) {
         setError("You must accept the terms and conditions to continue.");
@@ -189,7 +202,18 @@ function OnboardingContent() {
   
   const handleBack = () => {
     if (currentStep === "phone") setCurrentStep("personal");
-    else if (currentStep === "terms") setCurrentStep("phone");
+    else if (currentStep === "ward") {
+      // When going back from ward, return to phone verification
+      setCurrentStep("phone");
+    }
+    else if (currentStep === "terms") {
+      // When going back from terms, go to ward or phone depending on flow
+      if (sessionContext.sessionId) {
+        setCurrentStep("phone");
+      } else {
+        setCurrentStep("ward");
+      }
+    }
     setError(null);
   };
 
@@ -548,6 +572,43 @@ function OnboardingContent() {
     );
   };
 
+  // Render ward selection step
+  const renderWardSelectionStep = () => {
+    return (
+      <div className="space-y-4">
+        <div>
+          <h1 className="text-2xl font-bold mb-2">Ward Selection</h1>
+          <p className="text-muted-foreground">
+            Select your ward or branch to participate in cleaning assignments (optional)
+          </p>
+        </div>
+
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <p className="text-sm mb-4">
+              Joining a ward will allow you to participate in cleaning assignments and view schedules.
+              You can skip this step and join a ward later from your profile settings.
+            </p>
+            
+            <div className="mb-4">
+              <WardSelectionDropdown
+                onWardSelect={(wardId) => updateFormData({ wardBranchId: wardId })}
+                selectedWardId={formData.wardBranchId}
+                label="Select Your Ward/Branch"
+              />
+            </div>
+            
+            {formData.wardBranchId && (
+              <div className="mt-4 p-3 bg-green-50 rounded-md border border-green-100 text-green-800 text-sm">
+                Ward selected. You'll be able to participate in cleaning assignments.
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   // Render success step
   const renderSuccessStep = () => {
     return (
@@ -627,6 +688,7 @@ function OnboardingContent() {
             {currentStep === "personal" && renderPersonalInfoStep()}
             {currentStep === "phone" && renderPhoneVerificationStep()}
             {currentStep === "terms" && renderTermsStep()}
+            {currentStep === "ward" && renderWardSelectionStep()}
             {currentStep === "success" && renderSuccessStep()}
             
             {currentStep !== "success" && (

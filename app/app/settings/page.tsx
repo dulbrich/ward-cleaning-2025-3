@@ -1,5 +1,6 @@
 "use client";
 
+import { WardMembershipManager } from "@/app/components/WardMembershipManager";
 import { ProfileForm } from "@/components/profile/profile-form";
 import { createClient } from "@/utils/supabase/client";
 import { CheckCircle, HelpCircle, PencilIcon, PlusCircle, Trash2, X } from "lucide-react";
@@ -330,6 +331,82 @@ export default function SettingsPage() {
     { name: 'Admin Options', active: activeTab === 'Admin Options' }
   ];
 
+  // Determine which tab content to show
+  const renderTabContent = () => {
+    switch (activeTab) {
+      case "Profile":
+        return (
+          <ProfileForm 
+            initialData={userData} 
+            onSave={(updatedData) => {
+              setUserData(updatedData);
+              toast.success("Profile updated successfully");
+            }} 
+          />
+        );
+      case "Ward/Branch":
+        // Use our new Ward Membership Manager component
+        // Import WardMembershipManager from "@/components/WardMembershipManager";
+        return (
+          <div className="space-y-4">
+            {loading ? (
+              <div className="flex items-center justify-center h-32">
+                <div className="loader"></div>
+              </div>
+            ) : (
+              <div>
+                {userData && (
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between mb-6">
+                      <h2 className="text-xl font-semibold">Ward Memberships</h2>
+                      <p className="text-sm text-muted-foreground">
+                        Manage your ward memberships and participation
+                      </p>
+                    </div>
+                    
+                    {/* Use the new WardMembershipManager component */}
+                    <div className="mt-4">
+                      <WardMembershipManager userId={userData.id} />
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      case "Schedule":
+        return (
+          <div className="space-y-4">
+            <h2 className="text-xl font-semibold">Schedule Settings</h2>
+            <p className="text-muted-foreground">
+              Configure your availability and schedule preferences
+            </p>
+            <div className="border rounded-md p-4 bg-muted/30">
+              <p className="text-center text-muted-foreground">
+                Schedule settings coming soon
+              </p>
+            </div>
+          </div>
+        );
+      case "Notifications":
+        return (
+          <div className="space-y-4">
+            <h2 className="text-xl font-semibold">Notification Settings</h2>
+            <p className="text-muted-foreground">
+              Configure how and when you receive notifications
+            </p>
+            <div className="border rounded-md p-4 bg-muted/30">
+              <p className="text-center text-muted-foreground">
+                Notification settings coming soon
+              </p>
+            </div>
+          </div>
+        );
+      default:
+        return null;
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Include help modal */}
@@ -357,17 +434,7 @@ export default function SettingsPage() {
         
         {/* Settings Content */}
         <div className="md:col-span-2 space-y-6">
-          {activeTab === 'Profile' && (
-            <div className="bg-card rounded-lg border p-6">
-              {loading ? (
-                <div className="h-80 flex items-center justify-center">
-                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-                </div>
-              ) : (
-                <ProfileForm userData={userData} />
-              )}
-            </div>
-          )}
+          {renderTabContent()}
           
           {activeTab === 'Ward/Branch' && (
             <div className="bg-card rounded-lg border p-6">
