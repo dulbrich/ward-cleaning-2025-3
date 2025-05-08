@@ -19,7 +19,6 @@ export interface OnboardingFormData {
   phoneNumber?: string;
   isPhoneVerified: boolean;
   hasAcceptedTerms: boolean;
-  wardBranchId?: string;
 }
 
-export type OnboardingStep = 'personal' | 'phone' | 'ward' | 'terms' | 'success'; 
+export type OnboardingStep = 'personal' | 'phone' | 'terms' | 'success'; 
