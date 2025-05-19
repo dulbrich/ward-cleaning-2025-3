@@ -11,7 +11,7 @@ import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { GhostDusterBuster } from "../../components/GhostDusterBuster";
-import { deleteWardTask, getLastWardDataImport, getTaskTemplates, getWardTasks, logWardDataImport, trackAnonymousUser } from "./actions";
+import { deleteWardTask, getLastWardDataImport, getTaskTemplates, getWardTasks, logWardDataImport, processWardListImport, trackAnonymousUser } from "./actions";
 import RichTextDisplayWithStyles from "./components/RichTextDisplay";
 import { TaskEditorDialogWithStyles as TaskEditorDialog } from "./TaskEditorDialog";
 
@@ -1276,8 +1276,28 @@ export default function ToolsPage() {
       
       setTrackedUsers(trackedCount);
       
+      // Process the ward list import to update ward_branch_members
+      try {
+        console.log(`Processing ward list import for ${ward.unit_number} (ward ID: ${selectedWard})`);
+        const processResult = await processWardListImport(ward.unit_number, selectedWard);
+        
+        if (processResult.success) {
+          console.log("Successfully processed ward list import");
+          setMessage(`Successfully imported ${allMembers.length} contacts and updated ward memberships.`);
+        } else {
+          console.warn("Warning: Ward list import processed but ward memberships were not updated:", processResult.error);
+          setMessage(`Successfully imported ${allMembers.length} contacts, but there was an issue updating ward memberships.`);
+        }
+      } catch (processError) {
+        console.error("Error processing ward list import:", processError);
+        setMessage(`Successfully imported ${allMembers.length} contacts, but there was an error updating ward memberships.`);
+      }
+      
       setSuccess(true);
-      setMessage(`Successfully imported ${allMembers.length} contacts and tracked ${trackedCount.new} anonymous users.`);
+      
+      // Save last import date to localStorage
+      localStorage.setItem('wardContactLastImport', new Date().toISOString());
+      
       setTimeout(() => {
         setSuccess(false);
         setImportProgress(null); // Reset progress

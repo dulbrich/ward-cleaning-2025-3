@@ -837,4 +837,103 @@ export async function uploadTaskImage(file: File) {
     console.error("Error uploading task image:", error);
     return { success: false, error: (error as Error).message };
   }
+}
+
+/**
+ * Processes the ward list import to update ward_branch_members
+ * This connects imported users to the ward membership system
+ * 
+ * @param unitNumber Unit number of the ward
+ * @param wardBranchId UUID of the ward/branch
+ * @returns Result of the process
+ */
+export async function processWardListImport(unitNumber: string, wardBranchId: string) {
+  try {
+    const supabase = await createClient();
+    
+    // Check if user is authenticated
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return { success: false, error: "Not authenticated" };
+    }
+    
+    // Call the database function to process ward list import
+    const { data, error } = await supabase
+      .rpc('process_ward_list_import', {
+        p_unit_number: unitNumber,
+        p_ward_branch_id: wardBranchId
+      });
+      
+    if (error) {
+      console.error("Error processing ward list import:", error);
+      return { 
+        success: false, 
+        error: `Error processing ward list import: ${error.message}`
+      };
+    }
+    
+    return { 
+      success: true, 
+      message: "Successfully processed ward list import"
+    };
+  } catch (error) {
+    console.error("Error in processWardListImport:", error);
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : "Unknown error processing ward list import"
+    };
+  }
+}
+
+/**
+ * Registers a youth member with parent/guardian approval
+ * This allows youth who aren't on ward lists to participate
+ * 
+ * @param youthUserId User ID of the youth member
+ * @param parentUserId User ID of the parent/guardian
+ * @param wardBranchId UUID of the ward/branch
+ * @returns Result of the registration
+ */
+export async function registerYouthMember(youthUserId: string, parentUserId: string, wardBranchId: string) {
+  try {
+    const supabase = await createClient();
+    
+    // Check if user is authenticated (should be the parent)
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return { success: false, error: "Not authenticated" };
+    }
+    
+    // Verify the parent is the one making the request
+    if (user.id !== parentUserId) {
+      return { success: false, error: "Only a parent/guardian can register a youth member" };
+    }
+    
+    // Call the database function to register youth member
+    const { data, error } = await supabase
+      .rpc('register_youth_member', {
+        p_user_id: youthUserId,
+        p_parent_user_id: parentUserId,
+        p_ward_branch_id: wardBranchId
+      });
+      
+    if (error) {
+      console.error("Error registering youth member:", error);
+      return { 
+        success: false, 
+        error: `Error registering youth member: ${error.message}`
+      };
+    }
+    
+    return { 
+      success: true, 
+      message: "Successfully registered youth member"
+    };
+  } catch (error) {
+    console.error("Error in registerYouthMember:", error);
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : "Unknown error registering youth member"
+    };
+  }
 } 
