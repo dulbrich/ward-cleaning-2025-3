@@ -934,7 +934,7 @@ export default function ToolsPage() {
         
         // If we have wards, select the primary one by default
         if (wards && wards.length > 0) {
-          const primaryWard = wards.find(ward => ward.is_primary);
+          const primaryWard = wards.find((ward: WardBranch) => ward.is_primary);
           const defaultWardId = primaryWard?.id || wards[0].id;
           const defaultUnitNumber = primaryWard?.unit_number || wards[0]?.unit_number;
           
