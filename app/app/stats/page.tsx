@@ -5,23 +5,28 @@ import { getUserAvatarUrl, getUserDisplayName } from "@/utils/user-helpers";
 import { redirect } from "next/navigation";
 
 export default async function StatsPage() {
-  const supabase = await createClient();
-  const {
-    data: { user }
-  } = await supabase.auth.getUser();
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user }
+    } = await supabase.auth.getUser();
 
-  if (!user) {
-    return redirect("/sign-in");
-  }
+    if (!user) {
+      return redirect("/sign-in");
+    }
 
-  const { data: profile } = await supabase
-    .from("user_profiles")
-    .select("*")
-    .eq("user_id", user.id)
-    .single();
+    const { data: profile, error: profileError } = await supabase
+      .from("user_profiles")
+      .select("*")
+      .eq("user_id", user.id)
+      .single();
 
-  const displayName = getUserDisplayName(user, profile || {});
-  const avatarUrl = getUserAvatarUrl(profile || {});
+    if (profileError) {
+      console.error("Error fetching user profile:", profileError);
+    }
+
+    const displayName = getUserDisplayName(user, profile || {});
+    const avatarUrl = getUserAvatarUrl(profile || {});
 
   // TODO: Replace placeholder values with real aggregated data
   const lifetimePoints = 0;
@@ -31,8 +36,8 @@ export default async function StatsPage() {
   const daysParticipated = 0;
   const bestStreak = 0;
 
-  return (
-    <div className="space-y-8">
+    return (
+      <div className="space-y-8">
       <div className="flex items-center gap-4">
         <UserAvatar displayName={displayName} avatarUrl={avatarUrl} />
         <div>
@@ -95,5 +100,14 @@ export default async function StatsPage() {
         <Button>Share Stats</Button>
       </div>
     </div>
-  );
+    );
+  } catch (error) {
+    console.error("Error rendering StatsPage:", error);
+    return (
+      <div className="space-y-4">
+        <h1 className="text-2xl font-bold">Stats</h1>
+        <p className="text-sm text-muted-foreground">Unable to load your stats.</p>
+      </div>
+    );
+  }
 }
