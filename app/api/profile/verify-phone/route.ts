@@ -39,7 +39,7 @@ export async function POST(request: Request) {
     
     // Create verification record
     const { error } = await supabase
-      .from("phone_verification")
+      .from("phone_verifications")
       .upsert({
         user_id: user.id,
         phone_number,

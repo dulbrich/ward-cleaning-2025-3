@@ -27,7 +27,7 @@ export async function POST(request: Request) {
 
     // Get the current verification code and phone number for this user
     const { data: verificationData, error: verificationError } = await supabase
-      .from("phone_verification")
+      .from("phone_verifications")
       .select("phone_number, verification_code, expires_at")
       .eq("user_id", user.id)
       .single();
@@ -75,7 +75,7 @@ export async function POST(request: Request) {
     
     // Delete the verification record
     await supabase
-      .from("phone_verification")
+      .from("phone_verifications")
       .delete()
       .eq("user_id", user.id);
     
