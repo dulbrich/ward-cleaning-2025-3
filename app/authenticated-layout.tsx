@@ -102,7 +102,8 @@ export default function AuthenticatedLayout({
   }, []);
 
   // Helper to determine sidebar expansion state
-  const sidebarIsExpanded = isMobile ? isSidebarExpanded : (isSidebarExpanded || isHovering);
+  // On mobile, always show the sidebar expanded when visible so text labels are displayed
+  const sidebarIsExpanded = isMobile ? true : (isSidebarExpanded || isHovering);
 
   // Handle hover with delayed scrollbar appearance
   const handleMouseEnter = () => {
