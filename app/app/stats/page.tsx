@@ -1,73 +1,98 @@
+import { UserAvatar } from "@/components/dashboard/user-avatar";
+import { Button } from "@/components/ui/button";
+import { createClient } from "@/utils/supabase/server";
+import { getUserAvatarUrl, getUserDisplayName } from "@/utils/user-helpers";
+import { redirect } from "next/navigation";
 
-import Image from "next/image";
-import { Trophy } from "lucide-react";
+export default async function StatsPage() {
+  const supabase = await createClient();
+  const {
+    data: { user }
+  } = await supabase.auth.getUser();
 
-type Leader = {
-  username: string;
-  avatar: string;
-  points: number;
-};
+  if (!user) {
+    return redirect("/sign-in");
+  }
 
-const data: Leader[] = [
-  { username: "sarah", avatar: "/images/avatars/avatar1.png", points: 150 },
-  { username: "michael", avatar: "/images/avatars/avatar2.png", points: 135 },
-  { username: "jessica", avatar: "/images/avatars/avatar3.png", points: 120 },
-  { username: "david", avatar: "/images/avatars/avatar4.png", points: 110 },
-  { username: "emily", avatar: "/images/avatars/avatar5.png", points: 105 },
-  { username: "jason", avatar: "/images/avatars/avatar1.png", points: 100 },
-];
+  const { data: profile } = await supabase
+    .from("user_profiles")
+    .select("*")
+    .eq("user_id", user.id)
+    .single();
 
-export default function StatsPage() {
-  const topThree = data.slice(0, 3);
-  const others = data.slice(3);
+  const displayName = getUserDisplayName(user, profile || {});
+  const avatarUrl = getUserAvatarUrl(profile || {});
+
+  // TODO: Replace placeholder values with real aggregated data
+  const lifetimePoints = 0;
+  const leaderboardRank = 0;
+  const totalTasks = 0;
+  const hoursSpent = 0;
+  const daysParticipated = 0;
+  const bestStreak = 0;
 
   return (
     <div className="space-y-8">
-      <h1 className="text-3xl font-bold">Leaderboard</h1>
-
-      {/* Top 3 placement */}
-      <div className="flex justify-center gap-6">
-        {topThree.map((user, idx) => {
-          const rank = idx + 1;
-          const orderClasses = rank === 1 ? "order-2" : rank === 2 ? "order-1" : "order-3";
-          const trophyColor =
-            rank === 1 ? "text-amber-400" : rank === 2 ? "text-gray-400" : "text-orange-700";
-
-          return (
-            <div key={user.username} className={`flex flex-col items-center ${orderClasses}`}>
-              <Trophy className={`h-6 w-6 ${trophyColor}`} />
-              <Image
-                src={user.avatar}
-                alt={user.username}
-                width={64}
-                height={64}
-                className="h-16 w-16 rounded-full object-cover mt-2"
-              />
-              <span className="mt-2 font-medium">{user.username}</span>
-              <span className="text-sm text-muted-foreground">{user.points} pts</span>
-            </div>
-          );
-        })}
+      <div className="flex items-center gap-4">
+        <UserAvatar displayName={displayName} avatarUrl={avatarUrl} />
+        <div>
+          <h1 className="text-2xl font-bold">{displayName}'s Stats</h1>
+          <p className="text-sm text-muted-foreground">
+            Lifetime Points: {lifetimePoints} • Rank: #{leaderboardRank}
+          </p>
+        </div>
       </div>
 
-      {/* Remaining rankings */}
-      <div className="bg-card rounded-lg border overflow-hidden divide-y mt-6">
-        {others.map((user, index) => (
-          <div key={user.username} className="flex items-center p-4">
-            <div className="w-6 text-sm font-medium">{index + 4}</div>
-            <div className="flex items-center gap-2 flex-1">
-              <Image
-                src={user.avatar}
-                alt={user.username}
-                width={32}
-                height={32}
-                className="h-8 w-8 rounded-full object-cover"
-              />
-              <span className="font-medium">{user.username}</span>
-            </div>
-            <div className="text-sm font-medium">{user.points} pts</div>
+      <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-4">
+        <div className="bg-card border rounded-lg p-4 text-center">
+          <h3 className="text-sm font-medium mb-1">Total Tasks Completed</h3>
+          <p className="text-4xl font-bold text-primary">{totalTasks}</p>
+        </div>
+        <div className="bg-card border rounded-lg p-4 text-center">
+          <h3 className="text-sm font-medium mb-1">Hours Spent Cleaning</h3>
+          <p className="text-4xl font-bold text-primary">{hoursSpent}</p>
+        </div>
+        <div className="bg-card border rounded-lg p-4 text-center">
+          <h3 className="text-sm font-medium mb-1">Days Participated</h3>
+          <p className="text-4xl font-bold text-primary">{daysParticipated}</p>
+        </div>
+        <div className="bg-card border rounded-lg p-4 text-center">
+          <h3 className="text-sm font-medium mb-1">Best Streak (weeks)</h3>
+          <p className="text-4xl font-bold text-primary">{bestStreak}</p>
+        </div>
+      </div>
+
+      <div className="grid gap-6 md:grid-cols-2">
+        <div className="bg-card border rounded-lg p-4">
+          <h3 className="font-semibold mb-2">Tasks Over Time</h3>
+          <div className="h-48 flex items-center justify-center border border-dashed rounded-md text-muted-foreground text-sm">
+            Chart Placeholder
           </div>
-        ))}
+        </div>
+        <div className="bg-card border rounded-lg p-4">
+          <h3 className="font-semibold mb-2">Hours Per Month</h3>
+          <div className="h-48 flex items-center justify-center border border-dashed rounded-md text-muted-foreground text-sm">
+            Chart Placeholder
+          </div>
+        </div>
+        <div className="bg-card border rounded-lg p-4 md:col-span-2">
+          <h3 className="font-semibold mb-2">Task Categories</h3>
+          <div className="h-48 flex items-center justify-center border border-dashed rounded-md text-muted-foreground text-sm">
+            Chart Placeholder
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <h2 className="text-xl font-bold mb-4">Recent Activity</h2>
+        <div className="bg-card border rounded-lg divide-y">
+          <div className="p-4 text-sm text-muted-foreground">No recent activity</div>
+        </div>
+      </div>
+
+      <div className="flex gap-2">
+        <Button variant="outline">Last 30 Days</Button>
+        <Button>Share Stats</Button>
       </div>
     </div>
   );
