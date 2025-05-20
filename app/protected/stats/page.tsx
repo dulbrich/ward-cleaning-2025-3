@@ -5,23 +5,41 @@ import { getUserAvatarUrl, getUserDisplayName } from "@/utils/user-helpers";
 import { redirect } from "next/navigation";
 
 export default async function StatsPage() {
-  const supabase = await createClient();
-  const {
-    data: { user }
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return redirect("/sign-in");
+  if (
+    !process.env.NEXT_PUBLIC_SUPABASE_URL ||
+    !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  ) {
+    return (
+      <div className="text-center text-red-600">
+        Missing Supabase environment variables. Please set
+        <code className="mx-1">NEXT_PUBLIC_SUPABASE_URL</code> and
+        <code className="mx-1">NEXT_PUBLIC_SUPABASE_ANON_KEY</code>.
+      </div>
+    );
   }
 
-  const { data: profile } = await supabase
-    .from("user_profiles")
-    .select("*")
-    .eq("user_id", user.id)
-    .single();
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user }
+    } = await supabase.auth.getUser();
 
-  const displayName = getUserDisplayName(user, profile || {});
-  const avatarUrl = getUserAvatarUrl(profile || {});
+    if (!user) {
+      return redirect("/sign-in");
+    }
+
+    const { data: profile, error: profileError } = await supabase
+      .from("user_profiles")
+      .select("*")
+      .eq("user_id", user.id)
+      .single();
+
+    if (profileError) {
+      console.error("Error fetching user profile:", profileError);
+    }
+
+    const displayName = getUserDisplayName(user, profile || {});
+    const avatarUrl = getUserAvatarUrl(profile || {});
 
   // TODO: Replace placeholder values with real aggregated data
   const lifetimePoints = 0;
@@ -31,8 +49,8 @@ export default async function StatsPage() {
   const daysParticipated = 0;
   const bestStreak = 0;
 
-  return (
-    <div className="space-y-8">
+    return (
+      <div className="space-y-8">
       <div className="flex items-center gap-4">
         <UserAvatar displayName={displayName} avatarUrl={avatarUrl} />
         <div>
@@ -95,5 +113,14 @@ export default async function StatsPage() {
         <Button>Share Stats</Button>
       </div>
     </div>
-  );
+    );
+  } catch (error) {
+    console.error("Error rendering StatsPage:", error);
+    return (
+      <div className="space-y-4">
+        <h1 className="text-2xl font-bold">Stats</h1>
+        <p className="text-sm text-muted-foreground">Unable to load your stats.</p>
+      </div>
+    );
+  }
 }
