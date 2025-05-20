@@ -5,6 +5,16 @@ import { getUserAvatarUrl, getUserDisplayName } from "@/utils/user-helpers";
 import { redirect } from "next/navigation";
 
 export default async function StatsPage() {
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+    return (
+      <div className="text-center text-red-600">
+        Missing Supabase environment variables. Please set
+        <code className="mx-1">NEXT_PUBLIC_SUPABASE_URL</code> and
+        <code className="mx-1">NEXT_PUBLIC_SUPABASE_ANON_KEY</code>.
+      </div>
+    );
+  }
+
   const supabase = await createClient();
   const {
     data: { user }
