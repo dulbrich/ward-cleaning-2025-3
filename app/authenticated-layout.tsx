@@ -11,6 +11,7 @@ import {
   DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
 import { useUserProfile } from "@/hooks/useUserProfile";
+import { createClient } from "@/utils/supabase/client";
 import {
   BarChart3,
   Bell,
@@ -35,6 +36,16 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+
+function getUserGroup(lastName?: string): string | null {
+  if (!lastName) return null;
+  const letter = lastName.charAt(0).toUpperCase();
+  if (letter >= "A" && letter <= "F") return "A";
+  if (letter >= "G" && letter <= "L") return "B";
+  if (letter >= "M" && letter <= "R") return "C";
+  if (letter >= "S" && letter <= "Z") return "D";
+  return null;
+}
 
 type NavItem = {
   title: string;
@@ -75,6 +86,8 @@ export default function AuthenticatedLayout({
   const [isHovering, setIsHovering] = useState(false);
   const [showScrollbar, setShowScrollbar] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [calendarCount, setCalendarCount] = useState<number | null>(null);
+  const [todoCount, setTodoCount] = useState<number | null>(null);
   const expandTimerRef = useRef<NodeJS.Timeout | null>(null);
   const pathname = usePathname();
   const { profile, loading } = useUserProfile();
@@ -135,6 +148,60 @@ export default function AuthenticatedLayout({
     }
   };
 
+  // Fetch badge counts for calendar and tasks
+  useEffect(() => {
+    const fetchCounts = async () => {
+      try {
+        const supabase = createClient();
+        const today = new Date().toISOString().split("T")[0];
+
+        // Cleaning calendar count
+        if (profile) {
+          const { data: scheduleData, error } = await supabase
+            .from("cleaning_schedules")
+            .select("id, assigned_group")
+            .gte("cleaning_date", today);
+
+          if (!error && scheduleData) {
+            const group = getUserGroup(profile.last_name);
+            const filtered = scheduleData.filter((ev: any) => {
+              if (ev.assigned_group === "All") return true;
+              if (!group) return true;
+              return ev.assigned_group === group;
+            });
+            setCalendarCount(filtered.length);
+          }
+        }
+
+        // Tasks count for next session
+        const { data: session, error: sessionErr } = await supabase
+          .from("cleaning_sessions")
+          .select("id, session_date")
+          .gte("session_date", today)
+          .order("session_date")
+          .limit(1)
+          .maybeSingle();
+
+        if (!sessionErr && session) {
+          const { count, error: taskErr } = await supabase
+            .from("cleaning_session_tasks")
+            .select("id", { count: "exact", head: true })
+            .eq("session_id", session.id)
+            .eq("status", "todo");
+          if (!taskErr) {
+            setTodoCount(count ?? 0);
+          }
+        }
+      } catch (err) {
+        console.error("Error fetching sidebar counts", err);
+      }
+    };
+
+    if (!loading) {
+      fetchCounts();
+    }
+  }, [loading, profile]);
+
   // Member section navigation items
   const memberItems: NavItem[] = [
     {
@@ -147,8 +214,7 @@ export default function AuthenticatedLayout({
       title: "My Stats",
       href: "/app/stats",
       icon: <BarChart3 size={24} />,
-      active: pathname === "/app/stats",
-      badge: 2
+      active: pathname === "/app/stats"
     },
     {
       title: "Leader Board",
@@ -161,13 +227,14 @@ export default function AuthenticatedLayout({
       href: "/app/tasks",
       icon: <ClipboardList size={24} />,
       active: pathname?.startsWith("/app/tasks") ?? false,
-      badge: 3
+      badge: todoCount ?? undefined
     },
     {
       title: "Cleaning Calendar",
       href: "/app/calendar",
       icon: <Calendar size={24} />,
-      active: pathname === "/app/calendar"
+      active: pathname === "/app/calendar",
+      badge: calendarCount ?? undefined
     }
   ];
 
@@ -177,8 +244,7 @@ export default function AuthenticatedLayout({
       title: "Messenger",
       href: "/app/messenger",
       icon: <MessageSquare size={24} />,
-      active: pathname === "/app/messenger",
-      badge: 5
+      active: pathname === "/app/messenger"
     },
     {
       title: "Campaigns",
@@ -196,8 +262,7 @@ export default function AuthenticatedLayout({
       title: "Schedule",
       href: "/app/schedule",
       icon: <Calendar size={24} />,
-      active: pathname === "/app/schedule",
-      badge: 1
+      active: pathname === "/app/schedule"
     },
     {
       title: "Reporting",

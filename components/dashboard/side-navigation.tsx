@@ -197,11 +197,11 @@ export default function SideNavigation({
                 {expanded && (
                   <div className="ml-3 flex items-center justify-between w-full">
                     <span>Tasks</span>
-                    <span className="inline-flex items-center justify-center w-5 h-5 bg-blue-500 text-white text-xs rounded-full ml-1">3</span>
+                    {/* Badge numbers will be added when functionality is implemented */}
                   </div>
                 )}
                 {!expanded && (
-                  <span className="absolute left-11 top-1.5 inline-flex items-center justify-center w-5 h-5 bg-blue-500 text-white text-xs rounded-full">3</span>
+                  {/* Badge numbers will be added when functionality is implemented */}
                 )}
               </a>
             </li>
@@ -224,11 +224,11 @@ export default function SideNavigation({
                 {expanded && (
                   <div className="ml-3 flex items-center justify-between w-full">
                     <span>Assignments</span>
-                    <span className="inline-flex items-center justify-center w-5 h-5 bg-blue-500 text-white text-xs rounded-full ml-1">3</span>
+                    {/* Badge numbers will be added when functionality is implemented */}
                   </div>
                 )}
                 {!expanded && (
-                  <span className="absolute left-11 top-1.5 inline-flex items-center justify-center w-5 h-5 bg-blue-500 text-white text-xs rounded-full">3</span>
+                  {/* Badge numbers will be added when functionality is implemented */}
                 )}
               </a>
             </li>
