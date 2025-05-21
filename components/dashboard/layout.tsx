@@ -6,6 +6,7 @@ interface UserProfile {
   full_name?: string;
   username?: string;
   avatar_url?: string;
+  role?: string;
   [key: string]: any;
 }
 
@@ -21,23 +22,25 @@ interface DashboardLayoutProps {
   children: React.ReactNode;
 }
 
-export default function DashboardLayout({ 
-  user, 
-  profile, 
-  children 
+export default function DashboardLayout({
+  user,
+  profile,
+  children
 }: DashboardLayoutProps) {
   // Get user display information using helper functions
   const displayName = getUserDisplayName(user, profile);
   const username = getUserUsername(user, profile);
   const avatarUrl = getUserAvatarUrl(profile);
-  
+  const isAdmin = profile?.role?.toLowerCase() === "admin";
+
   return (
     <DashboardClient
       displayName={displayName}
       username={username}
       avatarUrl={avatarUrl}
+      isAdmin={isAdmin}
     >
       {children}
     </DashboardClient>
   );
-} 
+}

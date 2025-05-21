@@ -26,14 +26,16 @@ interface DashboardClientProps {
   displayName: string;
   username: string;
   avatarUrl: string;
+  isAdmin: boolean;
   children: React.ReactNode;
 }
 
-export default function DashboardClient({ 
-  displayName, 
-  username, 
+export default function DashboardClient({
+  displayName,
+  username,
   avatarUrl,
-  children 
+  isAdmin,
+  children
 }: DashboardClientProps) {
   const pathname = usePathname();
   const [isMobile, setIsMobile] = useState(false);
@@ -83,7 +85,7 @@ export default function DashboardClient({
   return (
     <div className="flex h-screen w-full bg-[#111827] text-white">
       {/* Sidebar */}
-      <SideNavigation 
+      <SideNavigation
         expanded={sidebarExpanded}
         toggleExpanded={toggleExpanded}
         isMobile={isMobile}
@@ -93,6 +95,7 @@ export default function DashboardClient({
         displayName={displayName}
         username={username}
         avatarUrl={avatarUrl}
+        isAdmin={isAdmin}
       />
       
       {/* Main Content Area */}
