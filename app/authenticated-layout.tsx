@@ -310,9 +310,11 @@ export default function AuthenticatedLayout({
             
             <ThemeSwitcher />
             
-            <Button variant="ghost" size="icon" className="h-8 w-8 sm:h-9 sm:w-9">
-              <Cog size={18} className="text-muted-foreground" />
-            </Button>
+            <Link href="/app/settings" prefetch={true}>
+              <Button variant="ghost" size="icon" className="h-8 w-8 sm:h-9 sm:w-9">
+                <Cog size={18} className="text-muted-foreground" />
+              </Button>
+            </Link>
             
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
