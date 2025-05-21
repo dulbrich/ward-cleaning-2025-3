@@ -36,74 +36,9 @@ export default function DocsPage() {
                 <div>
                   <h3 className="text-sm font-semibold text-muted-foreground mb-2">Getting Started</h3>
                   <div className="space-y-1">
-                    {[
-                      { name: 'Introduction', active: true },
-                      { name: 'Member Onboarding' },
-                      { name: 'First Assignment' }
-                    ].map((item, i) => (
-                      <button 
-                        key={i} 
-                        className={`w-full text-left px-3 py-2 rounded-md text-sm ${item.active ? 'bg-primary/10 text-primary' : 'hover:bg-muted'}`}
-                      >
-                        {item.name}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                
-                <div>
-                  <h3 className="text-sm font-semibold text-muted-foreground mb-2">Cleaning Procedures</h3>
-                  <div className="space-y-1">
-                    {[
-                      { name: 'Chapel Cleaning' },
-                      { name: 'Restroom Cleaning' },
-                      { name: 'Classrooms' },
-                      { name: 'Cultural Hall' },
-                      { name: 'Windows & Mirrors' }
-                    ].map((item, i) => (
-                      <button 
-                        key={i} 
-                        className={`w-full text-left px-3 py-2 rounded-md text-sm hover:bg-muted`}
-                      >
-                        {item.name}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                
-                <div>
-                  <h3 className="text-sm font-semibold text-muted-foreground mb-2">Equipment Usage</h3>
-                  <div className="space-y-1">
-                    {[
-                      { name: 'Vacuums' },
-                      { name: 'Floor Buffers' },
-                      { name: 'Cleaning Supplies' }
-                    ].map((item, i) => (
-                      <button 
-                        key={i} 
-                        className={`w-full text-left px-3 py-2 rounded-md text-sm hover:bg-muted`}
-                      >
-                        {item.name}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                
-                <div>
-                  <h3 className="text-sm font-semibold text-muted-foreground mb-2">Administrative</h3>
-                  <div className="space-y-1">
-                    {[
-                      { name: 'Scheduling Guidelines' },
-                      { name: 'Leading Teams' },
-                      { name: 'Reporting Issues' }
-                    ].map((item, i) => (
-                      <button 
-                        key={i} 
-                        className={`w-full text-left px-3 py-2 rounded-md text-sm hover:bg-muted`}
-                      >
-                        {item.name}
-                      </button>
-                    ))}
+                    <button className="w-full text-left px-3 py-2 rounded-md text-sm bg-primary/10 text-primary">
+                      Introduction
+                    </button>
                   </div>
                 </div>
               </div>
