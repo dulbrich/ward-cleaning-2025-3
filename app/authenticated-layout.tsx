@@ -287,18 +287,25 @@ export default function AuthenticatedLayout({
       active: pathname === "/app/tools"
     },
     {
-      title: "Settings",
-      href: "/app/settings",
-      icon: <Settings size={24} />,
-      active: pathname === "/app/settings"
-    },
-    {
       title: "Docs",
       href: "/app/docs",
       icon: <BookOpen size={24} />,
       active: pathname === "/app/docs"
     }
   ];
+
+  const settingsItem: NavItem = {
+    title: "Settings",
+    href: "/app/settings",
+    icon: <Settings size={24} />,
+    active: pathname === "/app/settings"
+  };
+
+  if (isAdmin) {
+    adminItems.push(settingsItem);
+  } else {
+    memberItems.push(settingsItem);
+  }
 
   // Render a navigation item
   const renderNavItem = (item: NavItem) => (
