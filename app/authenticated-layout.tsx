@@ -4,31 +4,31 @@ import { signOutAction } from "@/app/actions";
 import { ThemeSwitcher } from "@/components/theme-switcher";
 import { Button } from "@/components/ui/button";
 import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import {
-    BarChart3,
-    Bell,
-    BookOpen,
-    Calendar,
-    ClipboardList,
-    Cog,
-    FileText,
-    Home,
-    LogOut,
-    Megaphone,
-    Menu,
-    MessageSquare,
-    Settings,
-    Trophy,
-    Users,
-    Wrench,
-    X
+  BarChart3,
+  Bell,
+  BookOpen,
+  Calendar,
+  ClipboardList,
+  Cog,
+  FileText,
+  Home,
+  LogOut,
+  Megaphone,
+  Menu,
+  MessageSquare,
+  Settings,
+  Trophy,
+  Users,
+  Wrench,
+  X
 } from "lucide-react";
 import dynamic from "next/dynamic";
 import Image from "next/image";
@@ -160,7 +160,7 @@ export default function AuthenticatedLayout({
       title: "Tasks",
       href: "/app/tasks",
       icon: <ClipboardList size={24} />,
-      active: pathname.startsWith("/app/tasks"),
+      active: pathname?.startsWith("/app/tasks") ?? false,
       badge: 3
     }
   ];
