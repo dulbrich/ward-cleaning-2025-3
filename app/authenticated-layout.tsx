@@ -438,7 +438,7 @@ export default function AuthenticatedLayout({
                 </div>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>
-                  <Link href="/app/profile" className="cursor-pointer">
+                  <Link href="/app/settings" className="cursor-pointer">
                     Profile Settings
                   </Link>
                 </DropdownMenuItem>
