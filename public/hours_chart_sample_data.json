@@ -1,0 +1,14 @@
+[
+  { "month": "2024-06-01", "hours": 5.5, "sessionCount": 2 },
+  { "month": "2024-07-01", "hours": 8.0, "sessionCount": 3 },
+  { "month": "2024-08-01", "hours": 4.5, "sessionCount": 2 },
+  { "month": "2024-09-01", "hours": 6.0, "sessionCount": 2 },
+  { "month": "2024-10-01", "hours": 7.2, "sessionCount": 3 },
+  { "month": "2024-11-01", "hours": 5.0, "sessionCount": 2 },
+  { "month": "2024-12-01", "hours": 9.1, "sessionCount": 4 },
+  { "month": "2025-01-01", "hours": 3.8, "sessionCount": 1 },
+  { "month": "2025-02-01", "hours": 4.7, "sessionCount": 2 },
+  { "month": "2025-03-01", "hours": 6.3, "sessionCount": 3 },
+  { "month": "2025-04-01", "hours": 7.5, "sessionCount": 3 },
+  { "month": "2025-05-01", "hours": 8.2, "sessionCount": 3 }
+]
