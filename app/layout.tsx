@@ -1,6 +1,5 @@
 import { createClient } from "@/utils/supabase/server";
 import { ThemeProvider } from "next-themes";
-import { Inter } from "next/font/google";
 import { Toaster } from "sonner";
 import AuthenticatedLayout from "./authenticated-layout";
 import "./globals.css";
@@ -30,11 +29,6 @@ export const viewport = {
   userScalable: false,
 };
 
-const inter = Inter({
-  weight: ["400", "500", "600", "700"],
-  display: "swap",
-  subsets: ["latin"],
-});
 
 export default async function RootLayout({
   children,
@@ -54,7 +48,7 @@ export default async function RootLayout({
   }
   
   return (
-    <html lang="en" className={inter.className} suppressHydrationWarning>
+    <html lang="en" className="font-sans" suppressHydrationWarning>
       <head>
         <link rel="manifest" href="/manifest.json" />
         <meta name="theme-color" content="#000000" />

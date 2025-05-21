@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import MarkdownRenderer from '@/components/markdown-renderer';
 
 export default function DocsPage() {
   return (
@@ -50,90 +51,7 @@ export default function DocsPage() {
         <div className="md:col-span-3 space-y-6">
           <div className="bg-card rounded-lg border p-6">
             <div className="prose dark:prose-invert max-w-none">
-              <h2>Introduction to Ward Cleaning</h2>
-              
-              <p>
-                Welcome to the Ward Cleaning documentation. This guide provides comprehensive
-                information about our cleaning procedures, tools, schedules, and responsibilities.
-                Whether you're a new volunteer or a seasoned team leader, you'll find valuable
-                resources here to help contribute to maintaining our building.
-              </p>
-              
-              <h3>Our Mission</h3>
-              
-              <p>
-                Our mission is to maintain a clean, safe, and welcoming environment for all ward members
-                and visitors. Through organized volunteer efforts, we ensure that our building remains
-                in excellent condition for worship services, activities, and community events.
-              </p>
-              
-              <h3>Getting Started</h3>
-              
-              <p>
-                New to ward cleaning duties? Here's what you need to know:
-              </p>
-              
-              <ul>
-                <li>
-                  <strong>Sign Up:</strong> Use the Schedule page to view available cleaning assignments and sign up for time slots that work for you.
-                </li>
-                <li>
-                  <strong>Check In:</strong> When you arrive for your assignment, check in with the team lead or mark your attendance in the app.
-                </li>
-                <li>
-                  <strong>Follow Procedures:</strong> Each area has specific cleaning procedures outlined in this documentation.
-                </li>
-                <li>
-                  <strong>Report Issues:</strong> If you notice any maintenance issues or supply shortages, report them through the app.
-                </li>
-                <li>
-                  <strong>Track Hours:</strong> Your contributions are automatically logged when you complete assignments.
-                </li>
-              </ul>
-              
-              <h3>Using This Documentation</h3>
-              
-              <p>
-                This documentation is organized into several sections:
-              </p>
-              
-              <ul>
-                <li>
-                  <strong>Getting Started:</strong> Basic information for new volunteers.
-                </li>
-                <li>
-                  <strong>Cleaning Procedures:</strong> Detailed guidelines for cleaning different areas.
-                </li>
-                <li>
-                  <strong>Equipment Usage:</strong> Instructions for using cleaning tools and equipment.
-                </li>
-                <li>
-                  <strong>Administrative:</strong> Information for team leaders and coordinators.
-                </li>
-              </ul>
-              
-              <div className="bg-muted p-4 rounded-md my-6">
-                <h4 className="mt-0">Need Help?</h4>
-                <p className="mb-0">
-                  If you have questions or need assistance, please contact the ward cleaning coordinator through the <Link href="/app/messenger" className="text-primary hover:underline">Messenger</Link> or refer to the <Link href="/app/contacts" className="text-primary hover:underline">Contacts</Link> page.
-                </p>
-              </div>
-              
-              <h3>Next Steps</h3>
-              
-              <p>
-                Now that you're familiar with the basics, we recommend exploring the following resources:
-              </p>
-              
-              <ul>
-                <li>Review the <span className="text-primary cursor-pointer">Member Onboarding</span> guide for detailed training information</li>
-                <li>Check out <span className="text-primary cursor-pointer">First Assignment</span> for tips on completing your first cleaning task</li>
-                <li>Browse the <span className="text-primary cursor-pointer">Cleaning Procedures</span> section for specific area guidelines</li>
-              </ul>
-              
-              <p>
-                Thank you for your willingness to serve and help maintain our building!
-              </p>
+              <MarkdownRenderer filePath="docs/content/INTRODUCTION.md" />
             </div>
             
             <div className="flex justify-between items-center mt-8 pt-6 border-t">
