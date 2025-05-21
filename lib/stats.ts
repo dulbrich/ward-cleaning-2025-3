@@ -73,3 +73,47 @@ export async function fetchUserRank(userId: string, unitNumber: string) {
 
   return rank === -1 ? null : rank + 1;
 }
+
+export interface CategoryBreakdownItem {
+  category: string;
+  total: number;
+}
+
+export async function fetchCategoryBreakdown(
+  userId: string,
+): Promise<CategoryBreakdownItem[]> {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from("cleaning_session_tasks")
+    .select("task:ward_tasks(category)")
+    .eq("assigned_to", userId)
+    .eq("status", "done");
+
+  if (error || !data) {
+    console.error("Error fetching category breakdown", error);
+    return [];
+  }
+
+  const counts: Record<string, number> = {};
+
+  for (const row of data as any[]) {
+    let category: string | undefined;
+    const task = (row as any).task;
+
+    if (task) {
+      if (Array.isArray(task)) {
+        category = task[0]?.category as string | undefined;
+      } else {
+        category = task.category as string | undefined;
+      }
+    }
+
+    category = category || "Uncategorized";
+    counts[category] = (counts[category] || 0) + 1;
+  }
+
+  return Object.entries(counts)
+    .map(([category, total]) => ({ category, total }))
+    .sort((a, b) => b.total - a.total);
+}
