@@ -91,6 +91,7 @@ export default function AuthenticatedLayout({
   const expandTimerRef = useRef<NodeJS.Timeout | null>(null);
   const pathname = usePathname();
   const { profile, loading } = useUserProfile();
+  const isAdmin = profile?.role?.toLowerCase() === "admin";
 
   // Check screen size on component mount and window resize
   useEffect(() => {
@@ -507,20 +508,21 @@ export default function AuthenticatedLayout({
             </div>
           </div>
           
-          {/* Admin Section */}
-          <div className="relative">
-            <div className={`
-              transition-opacity duration-200 h-6 px-4 mb-2
-              ${sidebarIsExpanded ? 'opacity-100' : 'opacity-0'}
-            `}>
-              <h3 className="text-xs font-semibold text-muted-foreground tracking-wider uppercase">
-                Admin
-              </h3>
+          {isAdmin && (
+            <div className="relative">
+              <div className={`
+                transition-opacity duration-200 h-6 px-4 mb-2
+                ${sidebarIsExpanded ? 'opacity-100' : 'opacity-0'}
+              `}>
+                <h3 className="text-xs font-semibold text-muted-foreground tracking-wider uppercase">
+                  Admin
+                </h3>
+              </div>
+              <div className="space-y-1">
+                {adminItems.map(renderNavItem)}
+              </div>
             </div>
-            <div className="space-y-1">
-              {adminItems.map(renderNavItem)}
-            </div>
-          </div>
+          )}
         </div>
       </aside>
 

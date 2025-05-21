@@ -9,6 +9,7 @@ export interface UserProfile {
   has_accepted_terms: boolean;
   created_at: string;
   updated_at: string;
+  role?: string;
 }
 
 export interface OnboardingFormData {

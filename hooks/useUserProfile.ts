@@ -14,6 +14,7 @@ export type UserProfile = {
   has_accepted_terms: boolean;
   created_at: string;
   updated_at: string;
+  role?: string;
 };
 
 export function useUserProfile() {
