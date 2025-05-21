@@ -5,11 +5,29 @@ export const dynamic = 'force-dynamic';
 import { signInAction } from "@/app/actions";
 import { FormMessage } from "@/components/form-message";
 import { Button } from "@/components/ui/button";
+import { Loader2 } from "lucide-react";
+import { useFormStatus } from "react-dom";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
+
+function SignInButton() {
+  const { pending } = useFormStatus();
+  return (
+    <Button type="submit" className="mb-2" aria-disabled={pending}>
+      {pending ? (
+        <>
+          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          Signing In...
+        </>
+      ) : (
+        "Sign In"
+      )}
+    </Button>
+  );
+}
 
 // Client component to handle search params
 function SignInContent() {
@@ -91,7 +109,7 @@ function SignInContent() {
             <p>You're signing in from a ward cleaning session. After signing in, you'll be redirected back to your tasks.</p>
           </div>
         )}
-        <Button className="mb-2">Sign In</Button>
+        <SignInButton />
         <div className="text-center text-sm mt-4">
           <Link
             href="/forgot-password"
