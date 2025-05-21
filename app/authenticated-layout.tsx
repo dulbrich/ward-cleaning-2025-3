@@ -162,6 +162,12 @@ export default function AuthenticatedLayout({
       icon: <ClipboardList size={24} />,
       active: pathname?.startsWith("/app/tasks") ?? false,
       badge: 3
+    },
+    {
+      title: "Cleaning Calendar",
+      href: "/app/calendar",
+      icon: <Calendar size={24} />,
+      active: pathname === "/app/calendar"
     }
   ];
 
