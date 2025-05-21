@@ -148,6 +148,15 @@ export default function AuthenticatedLayout({
     }
   };
 
+  // Always enable scrolling on mobile when the sidebar is open
+  useEffect(() => {
+    if (isMobile && isSidebarOpen) {
+      setShowScrollbar(true);
+    } else if (isMobile) {
+      setShowScrollbar(false);
+    }
+  }, [isMobile, isSidebarOpen]);
+
   // Fetch badge counts for calendar and tasks
   useEffect(() => {
     const fetchCounts = async () => {
