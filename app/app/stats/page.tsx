@@ -1,44 +1,71 @@
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import StatsCard from "@/components/stats/stats-card";
+import { TasksChart, HoursChart, CategoryChart } from "@/components/stats/charts";
+import ShareStatsButton from "@/components/stats/share-button";
+import { createClient } from "@/utils/supabase/server";
+import { fetchUserStats, fetchUserRank } from "@/lib/stats";
+import { redirect } from "next/navigation";
 
-export default function StatsPage() {
+export default async function StatsPage() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return redirect("/sign-in");
+  }
+
+  const { data: profile } = await supabase
+    .from("user_profiles")
+    .select("username, avatar_url")
+    .eq("user_id", user.id)
+    .single();
+
+  const { data: ward } = await supabase
+    .from("ward_branches")
+    .select("unit_number")
+    .eq("user_id", user.id)
+    .eq("is_primary", true)
+    .single();
+
+  const stats = await fetchUserStats(user.id);
+  const rank = ward ? await fetchUserRank(user.id, ward.unit_number) : null;
+
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold">My Stats</h1>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-card rounded-lg p-4 border">
-          <h2 className="text-lg font-medium mb-2">Cleaning Sessions</h2>
-          <p className="text-4xl font-bold text-primary">12</p>
-          <p className="text-sm text-muted-foreground mt-1">Last 30 days</p>
+      <div className="flex items-center gap-4">
+        <Avatar className="h-14 w-14">
+          <AvatarImage src={profile?.avatar_url || "/images/avatars/default.png"} alt="avatar" />
+          <AvatarFallback>{profile?.username?.charAt(0).toUpperCase() || "U"}</AvatarFallback>
+        </Avatar>
+        <div>
+          <h1 className="text-2xl font-bold">{profile?.username || "My Stats"}</h1>
+          <p className="text-sm text-muted-foreground">
+            {stats.lifetimePoints} points {rank && <>• Rank {rank}</>}
+          </p>
         </div>
-        <div className="bg-card rounded-lg p-4 border">
-          <h2 className="text-lg font-medium mb-2">Total Hours</h2>
-          <p className="text-4xl font-bold text-primary">24.5</p>
-          <p className="text-sm text-muted-foreground mt-1">Last 30 days</p>
-        </div>
-        <div className="bg-card rounded-lg p-4 border">
-          <h2 className="text-lg font-medium mb-2">Completion Rate</h2>
-          <p className="text-4xl font-bold text-primary">98%</p>
-          <p className="text-sm text-muted-foreground mt-1">All time</p>
+        <div className="ml-auto">
+          <ShareStatsButton />
         </div>
       </div>
-      
-      <h2 className="text-2xl font-bold mt-6">Recent Activity</h2>
-      <div className="bg-card rounded-lg border">
-        <div className="p-4 border-b">
-          <p className="text-sm font-medium">April 2, 2025</p>
-          <p>Completed chapel cleaning session</p>
-          <p className="text-sm text-muted-foreground">2.5 hours</p>
-        </div>
-        <div className="p-4 border-b">
-          <p className="text-sm font-medium">March 26, 2025</p>
-          <p>Completed nursery cleaning session</p>
-          <p className="text-sm text-muted-foreground">1.5 hours</p>
-        </div>
-        <div className="p-4">
-          <p className="text-sm font-medium">March 19, 2025</p>
-          <p>Completed restroom cleaning session</p>
-          <p className="text-sm text-muted-foreground">1 hour</p>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <StatsCard title="Lifetime Points" value={stats.lifetimePoints} />
+        <StatsCard title="Tasks Completed" value={stats.tasksCompleted} />
+        <StatsCard title="Days Participated" value={stats.daysParticipated} />
+        <StatsCard title="Hours Cleaning" value={stats.hoursSpent} />
+        <StatsCard title="Best Streak" value={stats.bestStreak} />
+      </div>
+
+      <div className="space-y-4">
+        <h2 className="text-xl font-bold">Progress</h2>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <TasksChart />
+          <HoursChart />
+          <CategoryChart />
         </div>
       </div>
     </div>
   );
-} 
+}
