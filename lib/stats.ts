@@ -73,3 +73,36 @@ export async function fetchUserRank(userId: string, unitNumber: string) {
 
   return rank === -1 ? null : rank + 1;
 }
+
+export interface CategoryTotal {
+  category: string;
+  total: number;
+}
+
+export async function fetchCategoryBreakdown(
+  userId: string
+): Promise<CategoryTotal[]> {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from("cleaning_session_tasks")
+    .select("task:ward_tasks(category)")
+    .eq("assigned_to", userId)
+    .eq("status", "done");
+
+  if (error) {
+    console.error("Error fetching category breakdown", error);
+    return [];
+  }
+
+  const totals = new Map<string, number>();
+
+  for (const row of data ?? []) {
+    const category = (row as any).task?.category || "Uncategorized";
+    totals.set(category, (totals.get(category) || 0) + 1);
+  }
+
+  return Array.from(totals.entries())
+    .map(([category, total]) => ({ category, total }))
+    .sort((a, b) => b.total - a.total);
+}
