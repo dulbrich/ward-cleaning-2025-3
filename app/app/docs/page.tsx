@@ -1,6 +1,31 @@
-import Link from 'next/link';
+import { promises as fs } from 'fs';
+import path from 'path';
+import rehypeRaw from 'rehype-raw';
+import rehypeStringify from 'rehype-stringify';
+import remarkParse from 'remark-parse';
+import remarkRehype from 'remark-rehype';
+import { unified } from 'unified';
 
-export default function DocsPage() {
+// Function to convert markdown to HTML
+async function markdownToHtml(markdown: string) {
+  const result = await unified()
+    .use(remarkParse)
+    .use(remarkRehype, { allowDangerousHtml: true }) // Pass raw HTML
+    .use(rehypeRaw) // Parse the raw HTML
+    .use(rehypeStringify)
+    .process(markdown);
+  
+  return result.toString();
+}
+
+export default async function DocsPage() {
+  // Read the INTRODUCTION.md file content
+  const introductionPath = path.join(process.cwd(), 'public', 'docs', 'INTRODUCTION.md');
+  const markdownContent = await fs.readFile(introductionPath, 'utf8');
+  
+  // Convert markdown to HTML
+  const htmlContent = await markdownToHtml(markdownContent);
+
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-bold">Documentation</h1>
@@ -49,91 +74,9 @@ export default function DocsPage() {
         {/* Main Content */}
         <div className="md:col-span-3 space-y-6">
           <div className="bg-card rounded-lg border p-6">
-            <div className="prose dark:prose-invert max-w-none">
-              <h2>Introduction to Ward Cleaning</h2>
-              
-              <p>
-                Welcome to the Ward Cleaning documentation. This guide provides comprehensive
-                information about our cleaning procedures, tools, schedules, and responsibilities.
-                Whether you're a new volunteer or a seasoned team leader, you'll find valuable
-                resources here to help contribute to maintaining our building.
-              </p>
-              
-              <h3>Our Mission</h3>
-              
-              <p>
-                Our mission is to maintain a clean, safe, and welcoming environment for all ward members
-                and visitors. Through organized volunteer efforts, we ensure that our building remains
-                in excellent condition for worship services, activities, and community events.
-              </p>
-              
-              <h3>Getting Started</h3>
-              
-              <p>
-                New to ward cleaning duties? Here's what you need to know:
-              </p>
-              
-              <ul>
-                <li>
-                  <strong>Sign Up:</strong> Use the Schedule page to view available cleaning assignments and sign up for time slots that work for you.
-                </li>
-                <li>
-                  <strong>Check In:</strong> When you arrive for your assignment, check in with the team lead or mark your attendance in the app.
-                </li>
-                <li>
-                  <strong>Follow Procedures:</strong> Each area has specific cleaning procedures outlined in this documentation.
-                </li>
-                <li>
-                  <strong>Report Issues:</strong> If you notice any maintenance issues or supply shortages, report them through the app.
-                </li>
-                <li>
-                  <strong>Track Hours:</strong> Your contributions are automatically logged when you complete assignments.
-                </li>
-              </ul>
-              
-              <h3>Using This Documentation</h3>
-              
-              <p>
-                This documentation is organized into several sections:
-              </p>
-              
-              <ul>
-                <li>
-                  <strong>Getting Started:</strong> Basic information for new volunteers.
-                </li>
-                <li>
-                  <strong>Cleaning Procedures:</strong> Detailed guidelines for cleaning different areas.
-                </li>
-                <li>
-                  <strong>Equipment Usage:</strong> Instructions for using cleaning tools and equipment.
-                </li>
-                <li>
-                  <strong>Administrative:</strong> Information for team leaders and coordinators.
-                </li>
-              </ul>
-              
-              <div className="bg-muted p-4 rounded-md my-6">
-                <h4 className="mt-0">Need Help?</h4>
-                <p className="mb-0">
-                  If you have questions or need assistance, please contact the ward cleaning coordinator through the <Link href="/app/messenger" className="text-primary hover:underline">Messenger</Link> or refer to the <Link href="/app/contacts" className="text-primary hover:underline">Contacts</Link> page.
-                </p>
-              </div>
-              
-              <h3>Next Steps</h3>
-              
-              <p>
-                Now that you're familiar with the basics, we recommend exploring the following resources:
-              </p>
-              
-              <ul>
-                <li>Review the <span className="text-primary cursor-pointer">Member Onboarding</span> guide for detailed training information</li>
-                <li>Check out <span className="text-primary cursor-pointer">First Assignment</span> for tips on completing your first cleaning task</li>
-                <li>Browse the <span className="text-primary cursor-pointer">Cleaning Procedures</span> section for specific area guidelines</li>
-              </ul>
-              
-              <p>
-                Thank you for your willingness to serve and help maintain our building!
-              </p>
+            <div className="prose dark:prose-invert max-w-none markdown-content">
+              {/* Render the processed HTML content */}
+              <div dangerouslySetInnerHTML={{ __html: htmlContent }} />
             </div>
             
             <div className="flex justify-between items-center mt-8 pt-6 border-t">
@@ -186,4 +129,52 @@ export default function DocsPage() {
       </div>
     </div>
   );
-} 
+}
+
+// Add global CSS for the markdown content
+// You can also add this to your global CSS file
+const markdownStyles = `
+  .markdown-content h1, 
+  .markdown-content h2, 
+  .markdown-content h3, 
+  .markdown-content h4 {
+    margin-top: 1.5rem;
+    margin-bottom: 1rem;
+    font-weight: 600;
+    line-height: 1.25;
+  }
+
+  .markdown-content h1 {
+    font-size: 2rem;
+  }
+
+  .markdown-content h2 {
+    font-size: 1.5rem;
+    padding-top: 0.5rem;
+  }
+
+  .markdown-content h3 {
+    font-size: 1.25rem;
+    padding-top: 0.25rem;
+  }
+
+  .markdown-content p {
+    margin-top: 1rem;
+    margin-bottom: 1rem;
+    line-height: 1.6;
+  }
+
+  .markdown-content ul, .markdown-content ol {
+    margin-top: 1rem;
+    margin-bottom: 1rem;
+    padding-left: 1.5rem;
+  }
+
+  .markdown-content ul {
+    list-style-type: disc;
+  }
+
+  .markdown-content li {
+    margin-bottom: 0.5rem;
+  }
+`; 
