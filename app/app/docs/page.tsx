@@ -78,52 +78,6 @@ export default async function DocsPage() {
               {/* Render the processed HTML content */}
               <div dangerouslySetInnerHTML={{ __html: htmlContent }} />
             </div>
-            
-            <div className="flex justify-between items-center mt-8 pt-6 border-t">
-              <div></div>
-              <div>
-                <button className="flex items-center gap-2 text-primary hover:underline">
-                  Member Onboarding
-                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
-                  </svg>
-                </button>
-              </div>
-            </div>
-          </div>
-          
-          <div className="bg-card rounded-lg border p-6">
-            <h2 className="text-xl font-medium mb-4">Frequently Asked Questions</h2>
-            
-            <div className="space-y-4">
-              {[
-                { 
-                  question: 'How long are typical cleaning assignments?',
-                  answer: 'Most cleaning assignments range from 1-2 hours, depending on the area and tasks involved.'
-                },
-                { 
-                  question: 'What should I wear for cleaning assignments?',
-                  answer: 'Comfortable, casual clothing and closed-toe shoes are recommended. For some tasks, gloves will be provided.'
-                },
-                { 
-                  question: 'Can I bring my children to help with cleaning?',
-                  answer: 'Yes, children are welcome to help under adult supervision. There are many age-appropriate tasks they can assist with.'
-                },
-                { 
-                  question: 'What if I need to cancel my assignment?',
-                  answer: 'Please notify your team leader as soon as possible through the Messenger feature, or reschedule directly in the app.'
-                }
-              ].map((item, i) => (
-                <div key={i} className="border-b pb-4 last:border-b-0 last:pb-0">
-                  <h3 className="font-medium mb-2">{item.question}</h3>
-                  <p className="text-muted-foreground">{item.answer}</p>
-                </div>
-              ))}
-            </div>
-            
-            <div className="mt-6">
-              <button className="text-primary hover:underline text-sm">View All FAQs</button>
-            </div>
           </div>
         </div>
       </div>
