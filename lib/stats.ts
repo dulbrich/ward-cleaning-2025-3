@@ -1,4 +1,5 @@
 import { createClient } from "@/utils/supabase/server";
+import sampleHours from "@/sample-data/hours_chart_sample_data.json";
 
 export interface UserStats {
   lifetimePoints: number;
@@ -6,6 +7,12 @@ export interface UserStats {
   hoursSpent: number;
   daysParticipated: number;
   bestStreak: number;
+}
+
+export interface MonthlyHours {
+  month: string; // YYYY-MM
+  hours: number;
+  sessionCount: number;
 }
 
 export async function fetchUserStats(userId: string): Promise<UserStats> {
@@ -34,13 +41,27 @@ export async function fetchUserStats(userId: string): Promise<UserStats> {
   const uniqueSessions = new Set<string>();
   sessions?.forEach((row: any) => uniqueSessions.add(row.session_id));
 
+  const monthly = await fetchHoursByMonth(userId);
+  const hoursSpent = monthly.reduce((sum, m) => sum + m.hours, 0);
+
   return {
     lifetimePoints,
     tasksCompleted: tasksCompleted || 0,
-    hoursSpent: 0,
+    hoursSpent: Number(hoursSpent.toFixed(1)),
     daysParticipated: uniqueSessions.size,
     bestStreak: 0,
   };
+}
+
+export async function fetchHoursByMonth(
+  _userId: string
+): Promise<MonthlyHours[]> {
+  // Temporary implementation using sample data
+  return (sampleHours as MonthlyHours[]).map((row) => ({
+    month: row.month,
+    hours: row.hours,
+    sessionCount: row.sessionCount,
+  }));
 }
 
 export async function fetchUserRank(userId: string, unitNumber: string) {
