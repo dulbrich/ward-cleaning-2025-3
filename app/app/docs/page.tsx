@@ -53,10 +53,20 @@ export default function DocsPage() {
               <h2>Introduction to Ward Cleaning</h2>
               
               <p>
-                Welcome to the Ward Cleaning documentation. This guide provides comprehensive
-                information about our cleaning procedures, tools, schedules, and responsibilities.
-                Whether you're a new volunteer or a seasoned team leader, you'll find valuable
-                resources here to help contribute to maintaining our building.
+                Welcome to the Ward Cleaning documentation. This app helps wards, branches, and
+                stakes organize meetinghouse cleaning and share assignments with their members.
+                Here you&rsquo;ll find guides for every feature and tips for keeping the Lord&rsquo;s
+                buildings ready for worship.
+              </p>
+
+              <p>
+                "Reverence for the Lord's House Service and sacrifice help us grow in faith and
+                gain appreciation for what is sacred. Actions throughout the week can make our
+                cleaning efforts more effective. For example, ward councils can help by moving from
+                the foyers distracting items like posters and easels to other areas in the
+                meetinghouses. This can help keep our focus on worshiping the Savior, as shown by
+                the artwork in the foyers. Watch this video to learn about the growth others have
+                experienced as they&rsquo;ve cleaned and cared for meetinghouses."
               </p>
               
               <h3>Our Mission</h3>
@@ -111,6 +121,55 @@ export default function DocsPage() {
                   <strong>Administrative:</strong> Information for team leaders and coordinators.
                 </li>
               </ul>
+
+              <h3>Available Tools</h3>
+
+              <p>
+                The Ward Cleaning App offers several tools to help you stay organized and keep
+                members informed.
+              </p>
+
+              <h4>Messenger</h4>
+              <p>
+                Send personalized SMS reminders to members about upcoming assignments. Filter
+                contacts by group or focus on those who haven&rsquo;t registered yet.
+              </p>
+
+              <h4>Campaigns</h4>
+              <p>
+                Create reusable message templates with tokens for names, groups, and schedules.
+                These templates appear in Messenger so you can communicate quickly.
+              </p>
+
+              <h4>Contacts</h4>
+              <p>
+                View imported ward members and mark anyone who prefers not to be contacted. This
+                list powers other tools like Messenger and Schedule.
+              </p>
+
+              <h4>Schedule</h4>
+              <p>
+                Build cleaning calendars, assign groups to each Saturday, and view the schedule as
+                a list or calendar.
+              </p>
+
+              <h4>Reporting (Coming Soon)</h4>
+              <p>
+                A future dashboard will summarize volunteer hours, participation, and other key
+                statistics.
+              </p>
+
+              <h4>Tools</h4>
+              <p>
+                Use the Ward Contact Import to bring in member data from churchofjesuschrist.org
+                and the Task Builder to customize cleaning tasks for your building.
+              </p>
+
+              <h4>Settings</h4>
+              <p>
+                Manage your profile and ward or branch details here. Additional settings like
+                notifications will be added over time.
+              </p>
               
               <div className="bg-muted p-4 rounded-md my-6">
                 <h4 className="mt-0">Need Help?</h4>
