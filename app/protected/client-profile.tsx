@@ -4,6 +4,7 @@ import { FormMessage, Message } from "@/components/form-message";
 
 import Image from "next/image";
 import { useEffect, useState } from "react";
+import UpcomingCleaningEvents from "@/components/dashboard/upcoming-cleaning-events";
 
 // Client component for checking local storage
 export default function ClientProfile({ 
@@ -179,6 +180,8 @@ export default function ClientProfile({
       </div>
       
       {/* User details and tutorial steps removed as per design update */}
+
+      <UpcomingCleaningEvents lastName={profile?.last_name} />
     </div>
   );
 }
