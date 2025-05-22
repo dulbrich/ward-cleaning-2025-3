@@ -1,6 +1,6 @@
-import { NextResponse } from "next/server";
-import { createClient } from "@/utils/supabase/server";
 import { fetchCategoryBreakdown } from "@/lib/stats";
+import { createClient } from "@/utils/supabase/server";
+import { NextResponse } from "next/server";
 
 export async function GET() {
   const supabase = await createClient();
@@ -12,6 +12,15 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const data = await fetchCategoryBreakdown(user.id);
-  return NextResponse.json(data);
+  try {
+    console.log("Fetching category data for user:", user.id);
+    const data = await fetchCategoryBreakdown(user.id);
+    console.log("Category data result:", data);
+    
+    // Return the actual data from the database
+    return NextResponse.json(data);
+  } catch (error) {
+    console.error("Error in category endpoint:", error);
+    return NextResponse.json({ error: "Failed to fetch category data" }, { status: 500 });
+  }
 }

@@ -25,21 +25,48 @@ export function HoursChart() {
 
 export function CategoryChart() {
   const [data, setData] = useState<CategoryTotal[] | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    setIsLoading(true);
     fetch("/api/stats/category")
-      .then((res) => (res.ok ? res.json() : []))
-      .then((d) => setData(d))
-      .catch(() => setData([]));
+      .then((res) => {
+        if (!res.ok) {
+          throw new Error(`API error with status ${res.status}`);
+        }
+        return res.json();
+      })
+      .then((d) => {
+        console.log("CategoryChart data received:", d);
+        setData(Array.isArray(d) ? d : []);
+        setError(null);
+      })
+      .catch((err) => {
+        console.error("Error fetching category data:", err);
+        setError(err.message);
+        setData([]);
+      })
+      .finally(() => {
+        setIsLoading(false);
+      });
   }, []);
 
-  if (data === null) {
+  if (isLoading) {
     return (
       <div className="h-48 rounded-md border bg-muted/50 animate-pulse" />
     );
   }
 
-  if (data.length === 0) {
+  if (error) {
+    return (
+      <div className="h-48 flex items-center justify-center rounded-md border bg-muted/50 text-muted-foreground">
+        Error loading chart
+      </div>
+    );
+  }
+
+  if (!data || data.length === 0) {
     return (
       <div className="h-48 flex items-center justify-center rounded-md border bg-muted/50 text-muted-foreground">
         No completed tasks yet

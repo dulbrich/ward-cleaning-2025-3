@@ -84,25 +84,96 @@ export async function fetchCategoryBreakdown(
 ): Promise<CategoryTotal[]> {
   const supabase = await createClient();
 
-  const { data, error } = await supabase
-    .from("cleaning_session_tasks")
-    .select("task:ward_tasks(category)")
-    .eq("assigned_to", userId)
-    .eq("status", "done");
-
-  if (error) {
-    console.error("Error fetching category breakdown", error);
+  try {
+    console.log("Starting fetchCategoryBreakdown for user:", userId);
+    return await manualCategoryQuery(userId, supabase);
+  } catch (error) {
+    console.error("Error in fetchCategoryBreakdown:", error);
     return [];
   }
+}
 
-  const totals = new Map<string, number>();
-
-  for (const row of data ?? []) {
-    const category = (row as any).task?.category || "Uncategorized";
-    totals.set(category, (totals.get(category) || 0) + 1);
+async function manualCategoryQuery(userId: string, supabase: any): Promise<CategoryTotal[]> {
+  try {
+    // Simplified approach - get completed tasks first
+    const { data: tasks, error: tasksError } = await supabase
+      .from("cleaning_session_tasks")
+      .select("task_id")
+      .eq("assigned_to", userId)
+      .eq("status", "done");
+      
+    if (tasksError || !tasks || tasks.length === 0) {
+      console.log("No completed tasks found in manual query");
+      return [];
+    }
+    
+    const taskIds = tasks.map((t: { task_id: string }) => t.task_id);
+    console.log(`Found ${taskIds.length} completed task IDs:`, taskIds);
+    
+    // Then get the categories for those tasks
+    const { data: wardTasks, error: wtError } = await supabase
+      .from("ward_tasks")
+      .select("id, template_id, title")
+      .in("id", taskIds);
+      
+    if (wtError || !wardTasks || wardTasks.length === 0) {
+      console.log("No ward tasks found for the completed tasks");
+      return [];
+    }
+    
+    interface WardTask {
+      id: string;
+      template_id?: string;
+      title: string;
+    }
+    
+    const templateIds = wardTasks
+      .map((wt: WardTask) => wt.template_id)
+      .filter((id?: string) => id != null) as string[];
+      
+    console.log(`Found ${templateIds.length} template IDs:`, templateIds);
+    
+    if (templateIds.length === 0) {
+      return [{ category: "Uncategorized", total: tasks.length }];
+    }
+    
+    // Finally get the categories from the templates
+    const { data: templates, error: tError } = await supabase
+      .from("task_templates")
+      .select("id, category")
+      .in("id", templateIds);
+      
+    if (tError || !templates || templates.length === 0) {
+      console.log("No templates found for the ward tasks");
+      return [{ category: "Uncategorized", total: tasks.length }];
+    }
+    
+    interface Template {
+      id: string;
+      category?: string;
+    }
+    
+    // Create a map of template IDs to categories
+    const categoryMap = new Map<string, string>();
+    templates.forEach((t: Template) => {
+      categoryMap.set(t.id, t.category || "Uncategorized");
+    });
+    
+    // Count tasks by category
+    const categoryCounts = new Map<string, number>();
+    wardTasks.forEach((wt: WardTask) => {
+      const category = wt.template_id ? categoryMap.get(wt.template_id) || "Uncategorized" : "Uncategorized";
+      categoryCounts.set(category, (categoryCounts.get(category) || 0) + 1);
+    });
+    
+    const results = Array.from(categoryCounts.entries())
+      .map(([category, total]) => ({ category, total }))
+      .sort((a, b) => b.total - a.total);
+      
+    console.log("Manual category query results:", results);
+    return results;
+  } catch (error) {
+    console.error("Error in manual category query:", error);
+    return [];
   }
-
-  return Array.from(totals.entries())
-    .map(([category, total]) => ({ category, total }))
-    .sort((a, b) => b.total - a.total);
 }
