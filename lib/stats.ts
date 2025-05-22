@@ -34,10 +34,66 @@ export async function fetchUserStats(userId: string): Promise<UserStats> {
   const uniqueSessions = new Set<string>();
   sessions?.forEach((row: any) => uniqueSessions.add(row.session_id));
 
+  // Calculate total hours spent
+  let hoursSpent = 0;
+  
+  try {
+    console.log(`Calculating hours spent for user: ${userId}`);
+    // Try the RPC function if available
+    const { data: timeData, error: timeError } = await supabase.rpc(
+      "calculate_user_hours",
+      { user_id: userId }
+    );
+    
+    if (!timeError && timeData) {
+      hoursSpent = parseFloat(timeData.total_hours) || 0;
+      console.log(`Hours from RPC: ${hoursSpent}`);
+    } else {
+      console.log("RPC failed or returned no data, falling back to manual calculation");
+      // Fallback calculation if the RPC isn't available
+      const { data: taskTimes, error } = await supabase
+        .from("cleaning_session_tasks")
+        .select("assigned_at, completed_at")
+        .eq("assigned_to", userId)
+        .eq("status", "done")
+        .not("completed_at", "is", null)
+        .not("assigned_at", "is", null);
+        
+      if (!error && taskTimes && taskTimes.length > 0) {
+        console.log(`Found ${taskTimes.length} tasks with timestamps`);
+        
+        hoursSpent = taskTimes.reduce((total, task) => {
+          const start = new Date(task.assigned_at);
+          const end = new Date(task.completed_at);
+          const diffHours = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
+          
+          // Apply business rules
+          if (diffHours < (1/60)) {
+            console.log(`Task skipped - less than 1 minute: ${diffHours.toFixed(3)} hours`);
+            return total; // Less than 1 minute
+          }
+          
+          const taskHours = Math.min(diffHours, 2); // Cap at 2 hours
+          console.log(`Task hours: ${taskHours.toFixed(2)} (from ${diffHours.toFixed(2)} hours)`);
+          return total + taskHours;
+        }, 0);
+        
+        console.log(`Total hours calculated: ${hoursSpent.toFixed(2)}`);
+      } else {
+        console.log("No task time data found or error occurred:", error);
+      }
+    }
+  } catch (error) {
+    console.error("Error calculating hours spent:", error);
+  }
+
+  const roundedHours = parseFloat(hoursSpent.toFixed(1));
+  console.log(`Final rounded hours: ${roundedHours}`);
+
   return {
     lifetimePoints,
     tasksCompleted: tasksCompleted || 0,
-    hoursSpent: 0,
+    hoursSpent: roundedHours,
     daysParticipated: uniqueSessions.size,
     bestStreak: 0,
   };
