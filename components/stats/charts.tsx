@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import {
   Area,
   AreaChart,
+  Bar,
+  BarChart,
   CartesianGrid,
   ResponsiveContainer,
   Tooltip,
@@ -23,10 +25,237 @@ interface HoursData {
   tasks: number;
 }
 
+interface TasksData {
+  date: string;
+  tasks: number;
+}
+
 export function TasksChart() {
+  const [data, setData] = useState<TasksData[] | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [timeRange, setTimeRange] = useState<"week" | "month" | "year" | "all">("all");
+
+  // A helper that summarizes data for debugging
+  const logDataSummary = (data: TasksData[] | null) => {
+    if (!data || data.length === 0) {
+      console.log("TasksChart: No data");
+      return;
+    }
+    
+    const totalTasks = data.reduce((sum, d) => sum + d.tasks, 0);
+    const daysWithTasks = data.filter(d => d.tasks > 0).length;
+    console.log(`TasksChart: ${data.length} days, ${daysWithTasks} with activity, total ${totalTasks} tasks`);
+    
+    // Log days with tasks
+    data.filter(d => d.tasks > 0).forEach(d => {
+      console.log(`  ${d.date}: ${d.tasks} tasks`);
+    });
+  };
+
+  useEffect(() => {
+    setIsLoading(true);
+    fetch(`/api/stats/tasks?range=${timeRange}`)
+      .then((res) => {
+        if (!res.ok) {
+          throw new Error(`API error with status ${res.status}`);
+        }
+        return res.json();
+      })
+      .then((d) => {
+        const formattedData = Array.isArray(d) ? d : [];
+        setData(formattedData);
+        logDataSummary(formattedData);
+        setError(null);
+      })
+      .catch((err) => {
+        console.error("Error fetching tasks data:", err);
+        setError(err.message);
+        setData([]);
+      })
+      .finally(() => {
+        setIsLoading(false);
+      });
+  }, [timeRange]);
+
+  const formatXTick = (value: string) => {
+    const date = new Date(value);
+    return date.getDate().toString();
+  };
+
+  const formatTooltipDate = (value: string) => {
+    const date = new Date(value);
+    return date.toLocaleDateString(undefined, {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+    });
+  };
+
+  // Calculate total tasks to determine if there's any data for the current time range
+  const totalTasks = data ? data.reduce((sum, item) => sum + item.tasks, 0) : 0;
+  const hasData = data !== null && totalTasks > 0;
+
+  // Calculate the max value for y-axis with a little padding
+  const maxTasks = data && data.length > 0
+    ? Math.max(Math.max(...data.map((d) => d.tasks)) * 1.2, 1) // Ensure a minimum scale
+    : 1;
+
+  // Custom tooltip component
+  const CustomTooltip = ({
+    active,
+    payload,
+    label,
+  }: TooltipProps<number, string>) => {
+    if (active && payload && payload.length) {
+      const data = payload[0].payload as TasksData;
+      return (
+        <div className="bg-popover p-2 rounded-md shadow-md border text-sm">
+          <p className="font-medium">{formatTooltipDate(data.date)}</p>
+          <p className="text-primary">
+            <span className="font-medium">{data.tasks}</span> task{data.tasks !== 1 ? "s" : ""} completed
+          </p>
+        </div>
+      );
+    }
+    return null;
+  };
+
+  // Time range selector buttons that are always shown
+  const TimeRangeSelector = () => (
+    <div className="flex text-xs space-x-2">
+      <button
+        onClick={() => setTimeRange("week")}
+        className={`px-2 py-0.5 rounded ${
+          timeRange === "week"
+            ? "bg-primary text-primary-foreground"
+            : "bg-muted hover:bg-muted/80"
+        }`}
+      >
+        Week
+      </button>
+      <button
+        onClick={() => setTimeRange("month")}
+        className={`px-2 py-0.5 rounded ${
+          timeRange === "month"
+            ? "bg-primary text-primary-foreground"
+            : "bg-muted hover:bg-muted/80"
+        }`}
+      >
+        Month
+      </button>
+      <button
+        onClick={() => setTimeRange("year")}
+        className={`px-2 py-0.5 rounded ${
+          timeRange === "year"
+            ? "bg-primary text-primary-foreground"
+            : "bg-muted hover:bg-muted/80"
+        }`}
+      >
+        Year
+      </button>
+      <button
+        onClick={() => setTimeRange("all")}
+        className={`px-2 py-0.5 rounded ${
+          timeRange === "all"
+            ? "bg-primary text-primary-foreground"
+            : "bg-muted hover:bg-muted/80"
+        }`}
+      >
+        All
+      </button>
+    </div>
+  );
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="flex flex-col h-48 rounded-md border p-4">
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="text-sm font-medium">Tasks Completed</h3>
+          <TimeRangeSelector />
+        </div>
+        <div className="flex-grow h-full rounded-md bg-muted/50 animate-pulse" />
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="flex flex-col h-48 rounded-md border p-4">
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="text-sm font-medium">Tasks Completed</h3>
+          <TimeRangeSelector />
+        </div>
+        <div className="flex-grow flex items-center justify-center text-muted-foreground">
+          Error loading chart
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="h-48 flex items-center justify-center rounded-md border bg-muted/50 text-muted-foreground">
-      Tasks Chart
+    <div className="flex flex-col h-48 rounded-md border p-4">
+      <div className="flex items-center justify-between mb-2">
+        <h3 className="text-sm font-medium">Tasks Completed</h3>
+        <TimeRangeSelector />
+      </div>
+      <div className="flex-1 w-full">
+        {!hasData ? (
+          // Empty state - but we still show the time range buttons
+          <div className="h-full flex flex-col items-center justify-center text-muted-foreground">
+            <div className="text-center">
+              <p>{`No tasks completed ${timeRange !== "all" ? `in this ${timeRange}` : "yet"}.`}</p>
+              <p className="text-xs mt-1">
+                {timeRange !== "all" 
+                  ? "Try a different time range or complete more tasks" 
+                  : "Complete tasks to track your progress!"}
+              </p>
+            </div>
+          </div>
+        ) : (
+          // Data visualization
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart
+              data={data}
+              margin={{ top: 10, right: 0, left: 0, bottom: 0 }}
+            >
+              <CartesianGrid 
+                strokeDasharray="3 3" 
+                vertical={false} 
+                stroke="hsl(var(--muted-foreground) / 0.2)" 
+              />
+              <XAxis
+                dataKey="date"
+                tickFormatter={formatXTick}
+                tick={{ fontSize: 10 }}
+                tickLine={false}
+                axisLine={false}
+                interval={"preserveStartEnd"}
+              />
+              <YAxis
+                domain={[0, maxTasks]}
+                tick={{ fontSize: 10 }}
+                tickLine={false}
+                axisLine={false}
+                width={25}
+                allowDecimals={false}
+              />
+              <Tooltip content={<CustomTooltip />} />
+              <Bar
+                dataKey="tasks"
+                fill="hsl(var(--primary))"
+                animationDuration={800}
+                animationBegin={0}
+                isAnimationActive={true}
+                barSize={6}
+                radius={[2, 2, 0, 0]}
+              />
+            </BarChart>
+          </ResponsiveContainer>
+        )}
+      </div>
     </div>
   );
 }
