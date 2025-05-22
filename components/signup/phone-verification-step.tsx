@@ -79,7 +79,9 @@ export function PhoneVerificationStep({ formData, updateFormData }: PhoneVerific
       <div>
         <h1 className="text-2xl font-bold mb-2">Verify Your Phone Number</h1>
         <p className="text-muted-foreground">
-          We'll send you a 6-digit code to verify your phone
+          We'll send you a 6-digit code to verify your phone. Requesting a code
+          opts you into automated SMS notifications. Reply "STOP" to opt out.
+          Msg &amp; data rates may apply.
         </p>
       </div>
 
