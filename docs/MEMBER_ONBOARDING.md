@@ -12,6 +12,11 @@ A ward member arrives at a cleaning session and encounters a QR code displayed o
 
 This specification focuses on what happens when the user selects the "Sign Up" option.
 
+Scanning the QR code and proceeding with signup also constitutes consent to
+receive automated SMS notifications about upcoming cleaning assignments.
+Users may disable these notifications in account settings or by replying
+**STOP** to any message.
+
 ### 2. Signup Process
 
 #### Session Context Preservation
