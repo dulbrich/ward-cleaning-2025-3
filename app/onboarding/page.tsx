@@ -202,6 +202,7 @@ function OnboardingContent() {
       // Create the request body with session context
       const requestBody = {
         ...formData,
+        smsOptIn: true,
         sessionContext: sessionContext.sessionId ? sessionContext : undefined
       };
       

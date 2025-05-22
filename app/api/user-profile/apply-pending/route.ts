@@ -60,6 +60,8 @@ export async function POST(request: NextRequest) {
           phone_number: pendingData.phoneNumber || existingProfile.phone_number,
           is_phone_verified: pendingData.isPhoneVerified !== undefined ? pendingData.isPhoneVerified : existingProfile.is_phone_verified,
           has_accepted_terms: pendingData.hasAcceptedTerms !== undefined ? pendingData.hasAcceptedTerms : existingProfile.has_accepted_terms,
+          sms_opt_in: pendingData.smsOptIn !== undefined ? pendingData.smsOptIn : existingProfile.sms_opt_in,
+          sms_opt_in_at: (pendingData.smsOptIn !== undefined ? pendingData.smsOptIn : existingProfile.sms_opt_in) ? new Date().toISOString() : existingProfile.sms_opt_in_at,
           updated_at: new Date().toISOString()
         })
         .eq('user_id', user.id)
@@ -86,6 +88,8 @@ export async function POST(request: NextRequest) {
           phone_number: pendingData.phoneNumber || "",
           is_phone_verified: pendingData.isPhoneVerified || false,
           has_accepted_terms: pendingData.hasAcceptedTerms || true,
+          sms_opt_in: pendingData.smsOptIn || false,
+          sms_opt_in_at: (pendingData.smsOptIn || false) ? new Date().toISOString() : null,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         })

@@ -21,10 +21,11 @@ export async function POST(request: Request) {
       lastName, 
       username, 
       avatarUrl, 
-      phoneNumber, 
-      isPhoneVerified, 
+      phoneNumber,
+      isPhoneVerified,
       hasAcceptedTerms,
-      sessionContext 
+      smsOptIn,
+      sessionContext
     } = requestBody;
     
     // Validate required fields
@@ -44,6 +45,8 @@ export async function POST(request: Request) {
         phone_number: phoneNumber,
         is_phone_verified: isPhoneVerified,
         has_accepted_terms: hasAcceptedTerms,
+        sms_opt_in: smsOptIn,
+        sms_opt_in_at: smsOptIn ? new Date().toISOString() : null,
         updated_at: new Date().toISOString()
       })
       .select();
