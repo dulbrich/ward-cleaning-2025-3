@@ -708,6 +708,10 @@ export default function SettingsPage() {
                     <div className="w-11 h-6 bg-muted rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
                   </label>
                 </div>
+
+                <p className="text-xs text-muted-foreground mt-1">
+                  Text <strong>STOP</strong> to unsubscribe or adjust preferences here.
+                </p>
                 
                 <div className="flex items-center justify-between">
                   <div>
