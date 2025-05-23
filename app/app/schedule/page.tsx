@@ -23,7 +23,7 @@ import {
 import { cn } from "@/lib/utils";
 import { createClient } from "@/utils/supabase/client";
 import { addMonths, eachDayOfInterval, endOfMonth, format, isSameMonth, parse, parseISO, startOfMonth } from "date-fns";
-import { AlertTriangle, ArrowLeft, ArrowRight, CalendarIcon, Clock, Copy, List, Mail, MoreHorizontal, Plus, Trash2 } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ArrowRight, CalendarIcon, Clock, Copy, List, Mail, MoreHorizontal, Plus, Trash2, ChevronsUpDown } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
@@ -223,7 +223,7 @@ export default function SchedulePage() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [calendarDays, setCalendarDays] = useState<ScheduleDay[]>([]);
   const [wardMembers, setWardMembers] = useState<WardMember[]>([]);
-  const [activeView, setActiveView] = useState<"calendar" | "list" | "text">("calendar");
+  const [activeView, setActiveView] = useState<"calendar" | "list" | "text" | "edit">("calendar");
   
   // Dialog states
   const [showScheduleDialog, setShowScheduleDialog] = useState(false);
@@ -796,6 +796,47 @@ export default function SchedulePage() {
     );
   };
 
+  // Render edit view with prototype infographic
+  const renderEditView = () => {
+    const groups = [
+      { label: 'A', count: 12 },
+      { label: 'B', count: 26 },
+      { label: 'C', count: 31 },
+      { label: 'D', count: 17 },
+    ];
+
+    const total = groups.reduce((sum, g) => sum + g.count, 0);
+
+    return (
+      <div className="space-y-4">
+        <h3 className="text-lg font-medium">Adjust Cleaning Assignments</h3>
+        <div
+          className="relative w-full max-w-2xl mx-auto border rounded-md overflow-hidden flex flex-col divide-y bg-card"
+          style={{ height: '720px' }}
+        >
+          {groups.map((g, idx) => {
+            const percent = (g.count / total) * 100;
+            return (
+              <div
+                key={g.label}
+                className="relative flex items-center justify-center"
+                style={{ height: `${percent}%` }}
+              >
+                <span className="absolute top-1 left-1 text-sm font-medium">{g.label}</span>
+                <span className="text-2xl font-bold">{g.count}</span>
+                {idx < groups.length - 1 && (
+                  <button className="absolute -bottom-3 left-1/2 -translate-x-1/2 bg-background border rounded-full p-1 shadow">
+                    <ChevronsUpDown className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
   // Add delete handlers
   const handleDeleteSchedule = async () => {
     if (!scheduleToDelete) return;
@@ -863,6 +904,9 @@ export default function SchedulePage() {
                 <Mail className="h-4 w-4 mr-2" />
                 Text
               </TabsTrigger>
+              <TabsTrigger value="edit" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                Edit
+              </TabsTrigger>
             </TabsList>
           </Tabs>
           
@@ -915,6 +959,7 @@ export default function SchedulePage() {
             {activeView === "calendar" && renderCalendarView()}
             {activeView === "list" && renderListView()}
             {activeView === "text" && renderTextView()}
+            {activeView === "edit" && renderEditView()}
           </div>
         </>
       )}

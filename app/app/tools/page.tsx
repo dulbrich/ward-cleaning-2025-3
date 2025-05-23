@@ -858,6 +858,7 @@ function TaskBuilderTool({ wardBranches, selectedWard, authError }: {
   );
 }
 
+
 export default function ToolsPage() {
   const [activeTool, setActiveTool] = useState("Ward Contact Import");
   const [file, setFile] = useState<File | null>(null);
@@ -1557,13 +1558,14 @@ export default function ToolsPage() {
 
     if (activeTool === "Task Builder") {
       return (
-        <TaskBuilderTool 
+        <TaskBuilderTool
           wardBranches={wardBranches}
           selectedWard={selectedWard}
           authError={authError}
         />
       );
     }
+
 
     // Default case if no tool matches (shouldn't happen with current setup)
     return <div>Select a tool from the menu.</div>;
