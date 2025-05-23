@@ -59,6 +59,11 @@ Users provide and verify their phone number to enable notification functionality
   - "Back" button (return to previous step)
   - "Verify & Continue" button (leading to EULA)
 
+By verifying a phone number, the user explicitly **opts in** to receive
+automated text messages about cleaning assignments and reminders. Message
+frequency may vary. Users can disable these SMS notifications at any time by
+replying **STOP** or by updating notification settings in their account profile.
+
 #### Verification Process:
 1. User enters phone number and clicks "Send Code"
 2. System sends SMS with 6-digit code to the provided number
@@ -89,6 +94,7 @@ Final step before account creation where users review and accept the terms of se
 - It is not the intent of the Ward Cleaning app to divulge or sell gathered information for gain
 - Users who share information will be giving the Ward Cleaning app explicit ownership of their data while it is in our possession
 - Users may delete their accounts at any time as it is not our intention to store their information indefinitely
+- By signing up, users consent to receive automated SMS notifications about cleaning assignments. Reply **STOP** or adjust notification settings in the app to opt out.
 
 #### Validation:
 - User must scroll through the entire EULA text
