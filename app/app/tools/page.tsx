@@ -6,10 +6,10 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { createClient } from "@/utils/supabase/client";
-import { AlertCircle, AlertTriangle, ChevronRight, ClipboardList, Edit, FileText, Loader2, MoreHorizontal, Plus, RefreshCw, Search, Trash2 } from "lucide-react";
+import { AlertCircle, AlertTriangle, ChevronRight, ClipboardList, Edit, FileText, Loader2, MoreHorizontal, Plus, RefreshCw, Search, Trash2, ChevronsUpDown } from "lucide-react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { GhostDusterBuster } from "../../components/GhostDusterBuster";
 import { deleteWardTask, getLastWardDataImport, getTaskTemplates, getWardTasks, logWardDataImport, processWardListImport, trackAnonymousUser } from "./actions";
 import RichTextDisplayWithStyles from "./components/RichTextDisplay";
@@ -858,6 +858,90 @@ function TaskBuilderTool({ wardBranches, selectedWard, authError }: {
   );
 }
 
+// Simple prototype for adjusting cleaning assignments
+function WardAssignmentsTool() {
+  const groups = ["A", "B", "C", "D"];
+  const [counts, setCounts] = useState([25, 25, 25, 25]); // start evenly distributed
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const startDrag = (idx: number) =>
+    (e: React.MouseEvent<HTMLButtonElement> | React.TouchEvent<HTMLButtonElement>) => {
+      e.preventDefault();
+
+      const startY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+      const startCounts = [...counts];
+      const container = containerRef.current;
+      if (!container) return;
+      const height = container.getBoundingClientRect().height;
+
+      const onMove = (ev: MouseEvent | TouchEvent) => {
+        const currentY = 'touches' in ev ? (ev as TouchEvent).touches[0].clientY : (ev as MouseEvent).clientY;
+        const deltaPercent = ((currentY - startY) / height) * 100;
+
+        let newFirst = startCounts[idx] + deltaPercent;
+        let newSecond = startCounts[idx + 1] - deltaPercent;
+
+        const total = startCounts[idx] + startCounts[idx + 1];
+
+        newFirst = Math.min(Math.max(newFirst, 0), total);
+        newSecond = total - newFirst;
+
+        const updated = [...startCounts];
+        updated[idx] = Math.round(newFirst);
+        updated[idx + 1] = Math.round(newSecond);
+
+        const diff = 100 - updated.reduce((a, b) => a + b, 0);
+        updated[updated.length - 1] += diff; // keep sum exactly 100
+
+        setCounts(updated);
+      };
+
+      const endMove = () => {
+        window.removeEventListener('mousemove', onMove);
+        window.removeEventListener('touchmove', onMove);
+        window.removeEventListener('mouseup', endMove);
+        window.removeEventListener('touchend', endMove);
+      };
+
+      window.addEventListener('mousemove', onMove);
+      window.addEventListener('touchmove', onMove);
+      window.addEventListener('mouseup', endMove);
+      window.addEventListener('touchend', endMove);
+    };
+
+  return (
+    <div className="space-y-6">
+      <h1 className="text-3xl font-bold">Adjust Cleaning Assignments</h1>
+      <div className="flex justify-center">
+        <div
+          ref={containerRef}
+          className="relative w-32 h-96 border rounded-md overflow-hidden"
+        >
+          {groups.map((g, idx) => (
+            <div
+              key={g}
+              style={{ height: `${counts[idx]}%` }}
+              className="relative flex items-center justify-center border-b last:border-b-0"
+            >
+              <span className="absolute top-1 left-1 text-sm font-medium">{g}</span>
+              <span className="text-2xl font-bold">{counts[idx]}</span>
+              {idx < groups.length - 1 && (
+                <button
+                  onMouseDown={startDrag(idx)}
+                  onTouchStart={startDrag(idx)}
+                  className="absolute -bottom-3 left-1/2 -translate-x-1/2 bg-background border rounded-full p-1 shadow"
+                >
+                  <ChevronsUpDown className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function ToolsPage() {
   const [activeTool, setActiveTool] = useState("Ward Contact Import");
   const [file, setFile] = useState<File | null>(null);
@@ -1334,6 +1418,7 @@ export default function ToolsPage() {
   const tools = [
     { name: "Ward Contact Import" },
     { name: "Task Builder" },
+    { name: "Ward Assignments" },
     // Add more tools here later
   ];
 
@@ -1557,12 +1642,16 @@ export default function ToolsPage() {
 
     if (activeTool === "Task Builder") {
       return (
-        <TaskBuilderTool 
+        <TaskBuilderTool
           wardBranches={wardBranches}
           selectedWard={selectedWard}
           authError={authError}
         />
       );
+    }
+
+    if (activeTool === "Ward Assignments") {
+      return <WardAssignmentsTool />;
     }
 
     // Default case if no tool matches (shouldn't happen with current setup)
