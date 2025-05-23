@@ -1,27 +1,69 @@
 "use client";
 
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { createClient } from "@/utils/supabase/client";
-import { AlertCircle, AlertTriangle, ChevronRight, ClipboardList, Edit, FileText, Loader2, MoreHorizontal, Plus, RefreshCw, Search, Trash2 } from "lucide-react";
+import {
+  AlertCircle,
+  AlertTriangle,
+  ChevronRight,
+  ClipboardList,
+  Edit,
+  FileText,
+  Loader2,
+  MoreHorizontal,
+  Plus,
+  RefreshCw,
+  Search,
+  Trash2,
+} from "lucide-react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { GhostDusterBuster } from "../../components/GhostDusterBuster";
-import { deleteWardTask, getLastWardDataImport, getTaskTemplates, getWardTasks, logWardDataImport, processWardListImport, trackAnonymousUser } from "./actions";
+import {
+  deleteWardTask,
+  getLastWardDataImport,
+  getTaskTemplates,
+  getWardTasks,
+  logWardDataImport,
+  processWardListImport,
+  trackAnonymousUser,
+} from "./actions";
 import RichTextDisplayWithStyles from "./components/RichTextDisplay";
 import { TaskEditorDialogWithStyles as TaskEditorDialog } from "./TaskEditorDialog";
 
 // Dynamically import SyntaxHighlighter to prevent SSR issues
 const DynamicSyntaxHighlighter = dynamic(
-  () => import("react-syntax-highlighter").then((mod) => {
-    // We're using a simpler import strategy to avoid polyfill issues
-    return mod.Prism;
-  }),
-  { ssr: false }
+  () =>
+    import("react-syntax-highlighter").then((mod) => {
+      // We're using a simpler import strategy to avoid polyfill issues
+      return mod.Prism;
+    }),
+  { ssr: false },
 );
 
 // Define Ward/Branch interface
@@ -41,10 +83,10 @@ interface WardBranch {
 function CodeBlock({ code }: { code: string }) {
   const [copied, setCopied] = useState(false);
   const [loaded, setLoaded] = useState(false);
-  
+
   // Check if we're in the browser to use syntax highlighter
   useEffect(() => {
-    setLoaded(typeof window !== 'undefined');
+    setLoaded(typeof window !== "undefined");
   }, []);
 
   const copyToClipboard = () => {
@@ -56,47 +98,47 @@ function CodeBlock({ code }: { code: string }) {
   // Theme that better matches the application design
   const customTheme = {
     'pre[class*="language-"]': {
-      background: 'hsl(222.2 84% 4.9%)',
-      color: 'hsl(210 40% 98%)',
-      whiteSpace: 'pre' as const,
-      wordBreak: 'normal' as const,
-      overflowWrap: 'normal' as const,
+      background: "hsl(222.2 84% 4.9%)",
+      color: "hsl(210 40% 98%)",
+      whiteSpace: "pre" as const,
+      wordBreak: "normal" as const,
+      overflowWrap: "normal" as const,
     },
     'code[class*="language-"]': {
-      color: 'hsl(210 40% 98%)',
-      whiteSpace: 'pre' as const,
-      wordBreak: 'normal' as const,
-      overflowWrap: 'normal' as const,
+      color: "hsl(210 40% 98%)",
+      whiteSpace: "pre" as const,
+      wordBreak: "normal" as const,
+      overflowWrap: "normal" as const,
     },
-    'comment': { color: 'hsl(217.2 32.6% 65%)' },
-    'string': { color: 'hsl(142.1 76.2% 76.5%)' },
-    'keyword': { color: 'hsl(217.2 91.2% 59.8%)' },
-    'function': { color: 'hsl(280 100% 70%)' },
-    'number': { color: 'hsl(30 100% 70%)' },
-    'operator': { color: 'hsl(280 100% 70%)' },
-    'punctuation': { color: 'hsl(210 40% 70%)' },
-    'property': { color: 'hsl(35.5 91.7% 75.3%)' },
-    'variable': { color: 'hsl(355.7 100% 75.3%)' }
+    comment: { color: "hsl(217.2 32.6% 65%)" },
+    string: { color: "hsl(142.1 76.2% 76.5%)" },
+    keyword: { color: "hsl(217.2 91.2% 59.8%)" },
+    function: { color: "hsl(280 100% 70%)" },
+    number: { color: "hsl(30 100% 70%)" },
+    operator: { color: "hsl(280 100% 70%)" },
+    punctuation: { color: "hsl(210 40% 70%)" },
+    property: { color: "hsl(35.5 91.7% 75.3%)" },
+    variable: { color: "hsl(355.7 100% 75.3%)" },
   };
 
   return (
-    <div className="relative w-full" style={{ width: '70%' }}>
+    <div className="relative w-full" style={{ width: "70%" }}>
       <div className="bg-card border border-border rounded-md w-full">
         <div className="overflow-x-auto overflow-y-hidden w-full">
           {loaded ? (
-            <DynamicSyntaxHighlighter 
-              language="javascript" 
+            <DynamicSyntaxHighlighter
+              language="javascript"
               style={customTheme}
               customStyle={{
-                fontSize: '0.875rem',
+                fontSize: "0.875rem",
                 margin: 0,
-                padding: '1rem',
-                paddingRight: '2rem',
-                background: 'hsl(222.2 84% 4.9%)',
-                whiteSpace: 'pre',
-                width: 'fit-content',
-                minWidth: '100%',
-                maxWidth: 'none',
+                padding: "1rem",
+                paddingRight: "2rem",
+                background: "hsl(222.2 84% 4.9%)",
+                whiteSpace: "pre",
+                width: "fit-content",
+                minWidth: "100%",
+                maxWidth: "none",
               }}
               wrapLines={false}
               wrapLongLines={false}
@@ -104,7 +146,14 @@ function CodeBlock({ code }: { code: string }) {
               {code}
             </DynamicSyntaxHighlighter>
           ) : (
-            <pre className="font-mono p-4 pr-8 bg-card text-card-foreground whitespace-pre w-full" style={{ overflow: 'auto', width: 'fit-content', minWidth: '100%' }}>
+            <pre
+              className="font-mono p-4 pr-8 bg-card text-card-foreground whitespace-pre w-full"
+              style={{
+                overflow: "auto",
+                width: "fit-content",
+                minWidth: "100%",
+              }}
+            >
               <code>{code}</code>
             </pre>
           )}
@@ -121,7 +170,15 @@ function CodeBlock({ code }: { code: string }) {
 }
 
 // Instruction step component
-function InstructionStep({ number, title, description }: { number: number; title: string; description: string | React.ReactNode }) {
+function InstructionStep({
+  number,
+  title,
+  description,
+}: {
+  number: number;
+  title: string;
+  description: string | React.ReactNode;
+}) {
   return (
     <div className="flex gap-4 mb-6">
       <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground">
@@ -200,16 +257,16 @@ const TASK_CATEGORIES = [
   "General",
   "Exterior",
   "Windows",
-  "Other"
+  "Other",
 ];
 
 // Task List component
-function TaskList({ 
-  tasks, 
-  onEdit, 
-  onDelete, 
-  isLoading 
-}: { 
+function TaskList({
+  tasks,
+  onEdit,
+  onDelete,
+  isLoading,
+}: {
   tasks: WardTask[];
   onEdit: (task: WardTask) => void;
   onDelete: (taskId: string) => void;
@@ -228,42 +285,56 @@ function TaskList({
       <div className="bg-muted/50 rounded-lg flex flex-col items-center justify-center p-12 text-center">
         <ClipboardList className="h-12 w-12 text-muted-foreground mb-4" />
         <h3 className="text-lg font-medium">No tasks yet</h3>
-        <p className="text-muted-foreground mt-2 mb-4">Get started by adding your first cleaning task</p>
+        <p className="text-muted-foreground mt-2 mb-4">
+          Get started by adding your first cleaning task
+        </p>
       </div>
     );
   }
 
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      {tasks.map(task => (
-        <div key={task.id} className="bg-card border rounded-lg overflow-hidden flex flex-col h-64">
+      {tasks.map((task) => (
+        <div
+          key={task.id}
+          className="bg-card border rounded-lg overflow-hidden flex flex-col h-64"
+        >
           {/* Task header with color */}
-          <div 
+          <div
             className="p-4 border-b flex justify-between items-start"
             style={task.color ? { borderLeft: `4px solid ${task.color}` } : {}}
           >
             <div className="flex-1 min-w-0 pr-2">
               <h3 className="font-medium truncate">{task.title}</h3>
-              {task.subtitle && <p className="text-sm text-muted-foreground truncate">{task.subtitle}</p>}
+              {task.subtitle && (
+                <p className="text-sm text-muted-foreground truncate">
+                  {task.subtitle}
+                </p>
+              )}
               <div className="flex flex-wrap gap-1 mt-1">
                 {/* Display task priority if set */}
                 {task.priority && (
-                  <Badge variant={task.priority === 'do_first' ? 'destructive' : 'default'} className="text-xs">
-                    {task.priority === 'do_first' ? 'Do First' : 'Do Last'}
+                  <Badge
+                    variant={
+                      task.priority === "do_first" ? "destructive" : "default"
+                    }
+                    className="text-xs"
+                  >
+                    {task.priority === "do_first" ? "Do First" : "Do Last"}
                   </Badge>
                 )}
                 {/* Display kid-friendly badge if true */}
                 {task.kid_friendly && (
-                  <Badge 
-                    variant="outline" 
+                  <Badge
+                    variant="outline"
                     className="text-xs bg-[#ec4899] text-white hover:bg-[#ec4899] hover:text-white"
                   >
                     Kid-friendly
                   </Badge>
                 )}
                 {/* Display points value */}
-                <Badge 
-                  variant="outline" 
+                <Badge
+                  variant="outline"
                   className="text-xs bg-amber-500 text-white hover:bg-amber-500 hover:text-white"
                 >
                   {task.points || 5} pts
@@ -282,8 +353,8 @@ function TaskList({
                   <DropdownMenuItem onClick={() => onEdit(task)}>
                     <Edit className="h-4 w-4 mr-2" /> Edit Task
                   </DropdownMenuItem>
-                  <DropdownMenuItem 
-                    onClick={() => onDelete(task.id || '')}
+                  <DropdownMenuItem
+                    onClick={() => onDelete(task.id || "")}
                     className="text-destructive focus:text-destructive"
                   >
                     <Trash2 className="h-4 w-4 mr-2" /> Delete Task
@@ -296,9 +367,9 @@ function TaskList({
           {/* Task image */}
           {task.image_url && (
             <div className="aspect-video bg-muted">
-              <img 
-                src={task.image_url} 
-                alt={task.title} 
+              <img
+                src={task.image_url}
+                alt={task.title}
                 className="w-full h-full object-cover"
               />
             </div>
@@ -308,15 +379,20 @@ function TaskList({
           <div className="p-4 flex-grow overflow-hidden flex flex-col">
             {/* Instructions - truncated */}
             <div>
-              <h4 className="text-xs font-medium text-muted-foreground mb-1">Instructions</h4>
+              <h4 className="text-xs font-medium text-muted-foreground mb-1">
+                Instructions
+              </h4>
               <div className="text-sm line-clamp-3 overflow-hidden">
                 <HtmlContent html={task.instructions} />
               </div>
             </div>
-            
+
             {/* Ghost Duster Buster Easter Egg - compact version */}
             <div className="mt-auto">
-              <GhostDusterBuster title={task.title} instructions={task.instructions} />
+              <GhostDusterBuster
+                title={task.title}
+                instructions={task.instructions}
+              />
             </div>
           </div>
 
@@ -324,7 +400,7 @@ function TaskList({
           <div className="p-4 border-t">
             <div className="flex items-center justify-between">
               <Badge variant="outline">
-                {task.active ? 'Active' : 'Inactive'}
+                {task.active ? "Active" : "Inactive"}
               </Badge>
               <span className="text-xs text-muted-foreground">
                 {new Date(task.created_at).toLocaleDateString()}
@@ -338,20 +414,20 @@ function TaskList({
 }
 
 // Template Selection Dialog
-function TemplateSelectionDialog({ 
-  isOpen, 
-  onClose, 
-  onSelectTemplate 
-}: { 
-  isOpen: boolean; 
-  onClose: () => void; 
-  onSelectTemplate: (template: TaskTemplate) => void; 
+function TemplateSelectionDialog({
+  isOpen,
+  onClose,
+  onSelectTemplate,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  onSelectTemplate: (template: TaskTemplate) => void;
 }) {
   const [templates, setTemplates] = useState<TaskTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('All');
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("All");
 
   // Fetch templates when dialog opens
   useEffect(() => {
@@ -366,16 +442,17 @@ function TemplateSelectionDialog({
     setError(null);
 
     try {
-      const category = selectedCategory !== 'All' ? selectedCategory : undefined;
+      const category =
+        selectedCategory !== "All" ? selectedCategory : undefined;
       const result = await getTaskTemplates(category);
-      
+
       if (result.success) {
         setTemplates(result.data || []);
       } else {
-        setError(result.error || 'Failed to load templates');
+        setError(result.error || "Failed to load templates");
       }
     } catch (e) {
-      setError('An unexpected error occurred');
+      setError("An unexpected error occurred");
       console.error(e);
     } finally {
       setLoading(false);
@@ -386,19 +463,20 @@ function TemplateSelectionDialog({
   const handleCategoryChange = (category: string) => {
     setSelectedCategory(category);
     // Reset search when changing category
-    setSearchTerm('');
+    setSearchTerm("");
   };
 
   // Filter templates based on search term
   const filteredTemplates = useMemo(() => {
     if (!searchTerm.trim()) return templates;
-    
+
     const term = searchTerm.toLowerCase();
-    return templates.filter(template => 
-      template.title.toLowerCase().includes(term) ||
-      template.instructions.toLowerCase().includes(term) ||
-      template.equipment.toLowerCase().includes(term) ||
-      (template.safety && template.safety.toLowerCase().includes(term))
+    return templates.filter(
+      (template) =>
+        template.title.toLowerCase().includes(term) ||
+        template.instructions.toLowerCase().includes(term) ||
+        template.equipment.toLowerCase().includes(term) ||
+        (template.safety && template.safety.toLowerCase().includes(term)),
     );
   }, [templates, searchTerm]);
 
@@ -411,9 +489,13 @@ function TemplateSelectionDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent 
-        className="sm:max-w-3xl max-h-[90vh] overflow-y-auto" 
-        style={{ position: 'fixed', top: '5vh', transform: 'translateY(0) translateX(-50%)' }}
+      <DialogContent
+        className="sm:max-w-3xl max-h-[90vh] overflow-y-auto"
+        style={{
+          position: "fixed",
+          top: "5vh",
+          transform: "translateY(0) translateX(-50%)",
+        }}
       >
         <DialogHeader>
           <DialogTitle className="text-xl">Select a Task Template</DialogTitle>
@@ -431,17 +513,14 @@ function TemplateSelectionDialog({
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <Select
-            value={selectedCategory}
-            onValueChange={handleCategoryChange}
-          >
+          <Select value={selectedCategory} onValueChange={handleCategoryChange}>
             <SelectTrigger className="w-full sm:w-[180px]">
               <SelectValue placeholder="Category" />
             </SelectTrigger>
             <SelectContent>
               <SelectGroup>
                 <SelectLabel>Categories</SelectLabel>
-                {TASK_CATEGORIES.map(category => (
+                {TASK_CATEGORIES.map((category) => (
                   <SelectItem key={category} value={category}>
                     {category}
                   </SelectItem>
@@ -477,9 +556,9 @@ function TemplateSelectionDialog({
                 <FileText className="mx-auto h-12 w-12 mb-4" />
                 <p>No templates found</p>
                 {searchTerm && (
-                  <button 
+                  <button
                     className="mt-4 text-primary hover:underline"
-                    onClick={() => setSearchTerm('')}
+                    onClick={() => setSearchTerm("")}
                   >
                     Clear search
                   </button>
@@ -487,8 +566,8 @@ function TemplateSelectionDialog({
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {filteredTemplates.map(template => (
-                  <div 
+                {filteredTemplates.map((template) => (
+                  <div
                     key={template.id}
                     className="border rounded-lg p-4 hover:border-primary cursor-pointer transition-colors"
                     onClick={() => onSelectTemplate(template)}
@@ -517,7 +596,7 @@ function TemplateSelectionDialog({
         )}
 
         <DialogFooter>
-          <button 
+          <button
             className="px-4 py-2 rounded-md text-sm font-medium bg-muted hover:bg-muted/80"
             onClick={onClose}
           >
@@ -530,7 +609,11 @@ function TemplateSelectionDialog({
 }
 
 // Task Builder Component
-function TaskBuilderTool({ wardBranches, selectedWard, authError }: {
+function TaskBuilderTool({
+  wardBranches,
+  selectedWard,
+  authError,
+}: {
   wardBranches: WardBranch[];
   selectedWard: string;
   authError: boolean;
@@ -540,7 +623,9 @@ function TaskBuilderTool({ wardBranches, selectedWard, authError }: {
   const [error, setError] = useState<string | null>(null);
   const [isTemplateDialogOpen, setIsTemplateDialogOpen] = useState(false);
   const [isTaskEditorOpen, setIsTaskEditorOpen] = useState(false);
-  const [editingTask, setEditingTask] = useState<WardTask | undefined>(undefined);
+  const [editingTask, setEditingTask] = useState<WardTask | undefined>(
+    undefined,
+  );
   const [isConfirmDeleteOpen, setIsConfirmDeleteOpen] = useState(false);
   const [deleteTaskId, setDeleteTaskId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -558,7 +643,9 @@ function TaskBuilderTool({ wardBranches, selectedWard, authError }: {
   const [userId, setUserId] = useState<string | null>(null);
   useEffect(() => {
     const getUserId = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (user) {
         setUserId(user.id);
       }
@@ -569,20 +656,20 @@ function TaskBuilderTool({ wardBranches, selectedWard, authError }: {
   // Fetch tasks from the server
   const fetchTasks = async () => {
     if (!selectedWard) return;
-    
+
     setLoading(true);
     setError(null);
-    
+
     try {
       const result = await getWardTasks(selectedWard);
-      
+
       if (result.success) {
         setTasks(result.data || []);
       } else {
-        setError(result.error || 'Failed to load tasks');
+        setError(result.error || "Failed to load tasks");
       }
     } catch (e) {
-      setError('An unexpected error occurred');
+      setError("An unexpected error occurred");
       console.error(e);
     } finally {
       setLoading(false);
@@ -601,16 +688,16 @@ function TaskBuilderTool({ wardBranches, selectedWard, authError }: {
       ward_id: selectedWard,
       template_id: template.id,
       title: template.title,
-      subtitle: '',
+      subtitle: "",
       instructions: template.instructions,
       equipment: template.equipment,
-      safety: template.safety || '',
-      image_url: '',
-      color: '',
+      safety: template.safety || "",
+      image_url: "",
+      color: "",
       active: true,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
-      created_by: userId || ''
+      created_by: userId || "",
     });
     setIsTaskEditorOpen(true);
   };
@@ -641,25 +728,27 @@ function TaskBuilderTool({ wardBranches, selectedWard, authError }: {
   // Handle delete confirmation
   const handleConfirmDelete = async () => {
     if (!deleteTaskId) {
-      setError('Cannot delete: No task ID provided');
+      setError("Cannot delete: No task ID provided");
       setIsConfirmDeleteOpen(false);
       return;
     }
-    
+
     setIsDeleting(true);
-    
+
     try {
       const result = await deleteWardTask(deleteTaskId);
-      
+
       if (result.success) {
-        setTasks(prevTasks => prevTasks.filter(task => task.id !== deleteTaskId));
+        setTasks((prevTasks) =>
+          prevTasks.filter((task) => task.id !== deleteTaskId),
+        );
         setIsConfirmDeleteOpen(false);
         setDeleteTaskId(null);
       } else {
-        setError(result.error || 'Failed to delete task');
+        setError(result.error || "Failed to delete task");
       }
     } catch (e) {
-      setError('An unexpected error occurred while deleting the task');
+      setError("An unexpected error occurred while deleting the task");
       console.error(e);
     } finally {
       setIsDeleting(false);
@@ -675,7 +764,7 @@ function TaskBuilderTool({ wardBranches, selectedWard, authError }: {
           <h2 className="text-xl font-medium mb-2">Authentication Required</h2>
           <p className="mb-4">You need to be logged in to use this tool.</p>
           <button
-            onClick={() => router.push('/auth/login')}
+            onClick={() => router.push("/auth/login")}
             className="bg-primary text-primary-foreground hover:bg-primary/90 px-4 py-2 rounded-md text-sm font-medium"
           >
             Go to Login
@@ -691,16 +780,19 @@ function TaskBuilderTool({ wardBranches, selectedWard, authError }: {
       <div className="space-y-6">
         <h1 className="text-3xl font-bold">Task Builder</h1>
         <div className="bg-amber-50 text-amber-800 p-6 rounded-lg border border-amber-200">
-          <h2 className="text-xl font-medium mb-2">No Wards or Branches Found</h2>
+          <h2 className="text-xl font-medium mb-2">
+            No Wards or Branches Found
+          </h2>
           <div className="flex items-start gap-3 mb-4">
             <AlertCircle className="w-5 h-5 mt-0.5 flex-shrink-0" />
             <p>
-              You need to set up at least one ward or branch before using this tool.
-              Please go to Settings to add your ward or branch information.
+              You need to set up at least one ward or branch before using this
+              tool. Please go to Settings to add your ward or branch
+              information.
             </p>
           </div>
           <button
-            onClick={() => router.push('/app/settings')}
+            onClick={() => router.push("/app/settings")}
             className="bg-primary text-primary-foreground hover:bg-primary/90 px-4 py-2 rounded-md text-sm font-medium"
           >
             Go to Settings
@@ -721,17 +813,19 @@ function TaskBuilderTool({ wardBranches, selectedWard, authError }: {
             Create and manage cleaning tasks for your ward
           </p>
         </div>
-        
+
         <div className="flex gap-2">
           <button
             onClick={fetchTasks}
             className="px-3 py-2 rounded-md text-sm font-medium bg-muted hover:bg-muted/80 flex items-center"
             disabled={loading}
           >
-            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+            <RefreshCw
+              className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`}
+            />
             Refresh
           </button>
-          
+
           <button
             onClick={handleAddTask}
             className="px-3 py-2 rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 flex items-center"
@@ -793,15 +887,15 @@ function TaskBuilderTool({ wardBranches, selectedWard, authError }: {
             </DialogHeader>
             <div className="py-6">
               <p className="text-destructive font-semibold">
-                {!userId && !selectedWard 
-                  ? "User ID and Ward ID are missing" 
-                  : !userId 
-                    ? "User ID is missing" 
-                    : "Ward ID is missing"
-                }
+                {!userId && !selectedWard
+                  ? "User ID and Ward ID are missing"
+                  : !userId
+                    ? "User ID is missing"
+                    : "Ward ID is missing"}
               </p>
               <p className="mt-2">
-                Please refresh the page and try again. If the issue persists, please contact support.
+                Please refresh the page and try again. If the issue persists,
+                please contact support.
               </p>
             </div>
             <DialogFooter>
@@ -818,16 +912,22 @@ function TaskBuilderTool({ wardBranches, selectedWard, authError }: {
 
       {/* Delete confirmation dialog */}
       <Dialog open={isConfirmDeleteOpen} onOpenChange={setIsConfirmDeleteOpen}>
-        <DialogContent 
+        <DialogContent
           className="sm:max-w-md max-h-[90vh] overflow-y-auto"
-          style={{ position: 'fixed', top: '5vh', transform: 'translateY(0) translateX(-50%)' }}
+          style={{
+            position: "fixed",
+            top: "5vh",
+            transform: "translateY(0) translateX(-50%)",
+          }}
         >
           <DialogHeader>
             <DialogTitle className="text-xl">Delete Task</DialogTitle>
           </DialogHeader>
           <div className="py-6">
             <p className="mb-2">Are you sure you want to delete this task?</p>
-            <p className="text-muted-foreground text-sm">This action cannot be undone.</p>
+            <p className="text-muted-foreground text-sm">
+              This action cannot be undone.
+            </p>
           </div>
           <DialogFooter>
             <button
@@ -848,7 +948,7 @@ function TaskBuilderTool({ wardBranches, selectedWard, authError }: {
                   Deleting...
                 </>
               ) : (
-                'Delete Task'
+                "Delete Task"
               )}
             </button>
           </DialogFooter>
@@ -858,6 +958,8 @@ function TaskBuilderTool({ wardBranches, selectedWard, authError }: {
   );
 }
 
+// Simple prototype for adjusting cleaning assignments
+
 export default function ToolsPage() {
   const [activeTool, setActiveTool] = useState("Ward Contact Import");
   const [file, setFile] = useState<File | null>(null);
@@ -866,8 +968,11 @@ export default function ToolsPage() {
   const [success, setSuccess] = useState(false);
   const [lastImportDate, setLastImportDate] = useState<string | null>(null);
   const [authError, setAuthError] = useState(false);
-  const [trackedUsers, setTrackedUsers] = useState<{ new: number, existing: number }>({ new: 0, existing: 0 });
-  const [message, setMessage] = useState<string>('');
+  const [trackedUsers, setTrackedUsers] = useState<{
+    new: number;
+    existing: number;
+  }>({ new: 0, existing: 0 });
+  const [message, setMessage] = useState<string>("");
   const [importProgress, setImportProgress] = useState<number | null>(null);
   const [wardBranches, setWardBranches] = useState<WardBranch[]>([]);
   const [selectedWard, setSelectedWard] = useState<string>("");
@@ -913,45 +1018,48 @@ export default function ToolsPage() {
   useEffect(() => {
     // Check for authentication
     const checkAuth = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       if (!session) {
         setAuthError(true);
         setLoadingWards(false);
         return;
       }
-      
+
       // Fetch wards from the database
       try {
         const { data: wards, error } = await supabase
-          .from('ward_branches')
-          .select('*')
-          .order('is_primary', { ascending: false })
-          .order('name');
-          
+          .from("ward_branches")
+          .select("*")
+          .order("is_primary", { ascending: false })
+          .order("name");
+
         if (error) throw error;
-        
+
         setWardBranches(wards || []);
-        
+
         // If we have wards, select the primary one by default
         if (wards && wards.length > 0) {
           const primaryWard = wards.find((ward: WardBranch) => ward.is_primary);
           const defaultWardId = primaryWard?.id || wards[0].id;
-          const defaultUnitNumber = primaryWard?.unit_number || wards[0]?.unit_number;
-          
+          const defaultUnitNumber =
+            primaryWard?.unit_number || wards[0]?.unit_number;
+
           setSelectedWard(defaultWardId);
-          
+
           // Update script code with the primary ward's unit number
           if (defaultUnitNumber) {
             updateScriptWithUnitNumber(defaultUnitNumber);
           }
         }
-        
+
         // Check for last import date in localStorage
-        const storedLastImport = localStorage.getItem('wardContactLastImport');
+        const storedLastImport = localStorage.getItem("wardContactLastImport");
         if (storedLastImport) {
           setLastImportDate(storedLastImport);
         }
-  
+
         // Also fetch last import from database
         try {
           const result = await getLastWardDataImport();
@@ -962,10 +1070,15 @@ export default function ToolsPage() {
               console.error("Error fetching last import:", result.error);
             }
           } else if (result.data) {
-            const dbImportDate = new Date(result.data.imported_at).toLocaleString();
-            if (!storedLastImport || new Date(result.data.imported_at) > new Date(storedLastImport)) {
+            const dbImportDate = new Date(
+              result.data.imported_at,
+            ).toLocaleString();
+            if (
+              !storedLastImport ||
+              new Date(result.data.imported_at) > new Date(storedLastImport)
+            ) {
               setLastImportDate(dbImportDate);
-              localStorage.setItem('wardContactLastImport', dbImportDate);
+              localStorage.setItem("wardContactLastImport", dbImportDate);
             }
           }
         } catch (err) {
@@ -1022,9 +1135,9 @@ export default function ToolsPage() {
   const handleWardChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const selectedId = e.target.value;
     setSelectedWard(selectedId);
-    
+
     // Find the selected ward and update script with its unit number
-    const ward = wardBranches.find(w => w.id === selectedId);
+    const ward = wardBranches.find((w) => w.id === selectedId);
     if (ward?.unit_number) {
       updateScriptWithUnitNumber(ward.unit_number);
     }
@@ -1054,45 +1167,54 @@ export default function ToolsPage() {
     setError(null);
     setImportProgress(0);
     setTrackedUsers({ new: 0, existing: 0 });
-    
+
     try {
       // Check authentication first
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       if (!session) {
         setAuthError(true);
         throw new Error("You must be logged in to import data");
       }
-      
+
       // Find the selected ward to get its unit number
-      const ward = wardBranches.find(w => w.id === selectedWard);
+      const ward = wardBranches.find((w) => w.id === selectedWard);
       if (!ward) {
         throw new Error("Selected ward not found");
       }
-      
+
       // Read the file
       const fileContent = await file.text();
       let jsonData;
-      
+
       // Initialize arrays before JSON parsing
       const allMembers = [];
-      const trackedUsers: { firstName: string, lastName: string, result: any }[] = [];
-      
+      const trackedUsers: {
+        firstName: string;
+        lastName: string;
+        result: any;
+      }[] = [];
+
       try {
         jsonData = JSON.parse(fileContent);
-        
+
         // Log the basic structure for diagnostic purposes
         console.log("JSON Data Top-Level Structure:", Object.keys(jsonData));
-        
+
         // Check if it's an array at the top level
         if (Array.isArray(jsonData)) {
           console.log("Top-level is an array with", jsonData.length, "items");
-          console.log("First item keys:", jsonData[0] ? Object.keys(jsonData[0]) : "empty");
-          
+          console.log(
+            "First item keys:",
+            jsonData[0] ? Object.keys(jsonData[0]) : "empty",
+          );
+
           // Add a direct approach to handle this format
           console.log("Looking for household heads in array...");
           let headCount = 0;
           let phoneCount = 0;
-          
+
           // Filter format from docs/ward.json
           for (const household of jsonData) {
             if (household.members && Array.isArray(household.members)) {
@@ -1105,16 +1227,22 @@ export default function ToolsPage() {
                     // Add unit_number to the member object
                     member.unit_number = ward.unit_number;
                     allMembers.push(member);
-                    console.log(`Found household head with phone: ${member.givenName} ${member.surname}`);
+                    console.log(
+                      `Found household head with phone: ${member.givenName} ${member.surname}`,
+                    );
                   } else {
-                    console.log(`Found household head WITHOUT phone: ${member.givenName} ${member.surname}`);
+                    console.log(
+                      `Found household head WITHOUT phone: ${member.givenName} ${member.surname}`,
+                    );
                   }
                 }
               }
             }
           }
-          
-          console.log(`Found ${headCount} total household heads, ${phoneCount} with phone numbers`);
+
+          console.log(
+            `Found ${headCount} total household heads, ${phoneCount} with phone numbers`,
+          );
         } else {
           // Original structure handling continues below
           // Extract from households if available
@@ -1122,182 +1250,251 @@ export default function ToolsPage() {
             for (const household of jsonData.households) {
               if (household.members && Array.isArray(household.members)) {
                 // Only add household heads with phone numbers
-                const householdHeads = household.members.filter((member: any) => 
-                  member.head === true && 
-                  member.phone && 
-                  (typeof member.phone === 'object' ? member.phone.number || member.phone.e164 : member.phone)
-                ).map((member: any) => {
-                  // Add unit_number to the member object
-                  member.unit_number = ward.unit_number;
-                  return member;
-                });
+                const householdHeads = household.members
+                  .filter(
+                    (member: any) =>
+                      member.head === true &&
+                      member.phone &&
+                      (typeof member.phone === "object"
+                        ? member.phone.number || member.phone.e164
+                        : member.phone),
+                  )
+                  .map((member: any) => {
+                    // Add unit_number to the member object
+                    member.unit_number = ward.unit_number;
+                    return member;
+                  });
                 allMembers.push(...householdHeads);
               }
             }
           }
-          
+
           // If we're using a different structure, handle it similarly
           if (jsonData.members && Array.isArray(jsonData.members)) {
             // Filter for household heads with phone numbers
-            const householdHeads = jsonData.members.filter((member: any) => 
-              member.head === true && 
-              member.phone && 
-              (typeof member.phone === 'object' ? member.phone.number || member.phone.e164 : member.phone)
-            ).map((member: any) => {
-              // Add unit_number to the member object
-              member.unit_number = ward.unit_number;
-              return member;
-            });
+            const householdHeads = jsonData.members
+              .filter(
+                (member: any) =>
+                  member.head === true &&
+                  member.phone &&
+                  (typeof member.phone === "object"
+                    ? member.phone.number || member.phone.e164
+                    : member.phone),
+              )
+              .map((member: any) => {
+                // Add unit_number to the member object
+                member.unit_number = ward.unit_number;
+                return member;
+              });
             allMembers.push(...householdHeads);
           }
         }
       } catch (e) {
-        throw new Error("Invalid JSON file. Please ensure you're importing the correct file.");
+        throw new Error(
+          "Invalid JSON file. Please ensure you're importing the correct file.",
+        );
       }
-      
+
       // Log the structure of the JSON data to help diagnose issues
       console.log("JSON Data Structure:", Object.keys(jsonData));
-      
+
       // Validate basic structure
-      if (!jsonData || typeof jsonData !== 'object') {
-        throw new Error("Invalid data format. The file doesn't contain the expected data structure.");
+      if (!jsonData || typeof jsonData !== "object") {
+        throw new Error(
+          "Invalid data format. The file doesn't contain the expected data structure.",
+        );
       }
-      
+
       // Store in localStorage
-      localStorage.setItem('wardContactData', JSON.stringify(jsonData));
-      
+      localStorage.setItem("wardContactData", JSON.stringify(jsonData));
+
       // Clear existing anonymous users for this ward unit number
       try {
         // We'll implement this in the backend actions later
-        console.log(`Clearing existing anonymous users for ward unit number: ${ward.unit_number}`);
+        console.log(
+          `Clearing existing anonymous users for ward unit number: ${ward.unit_number}`,
+        );
       } catch (clearError) {
         console.error("Error clearing existing anonymous users:", clearError);
       }
-      
+
       // Start tracking anonymous users
       console.log("Starting anonymous user tracking.");
-      
+
       // Process each household/member
       const batchSize = 10; // Process 10 members at a time
-      
+
       for (let i = 0; i < allMembers.length; i += batchSize) {
         // Update progress
         setImportProgress(Math.round((i / allMembers.length) * 100));
-        
+
         // Get the current batch
         const batch = allMembers.slice(i, i + batchSize);
-        console.log(`Processing batch ${i / batchSize + 1} of ${Math.ceil(allMembers.length / batchSize)}, with ${batch.length} members`);
-        
+        console.log(
+          `Processing batch ${i / batchSize + 1} of ${Math.ceil(allMembers.length / batchSize)}, with ${batch.length} members`,
+        );
+
         // Process each member in the batch
         const batchPromises = batch.map(async (member) => {
           try {
             // Extract name data
-            const firstName = member.givenName || '';
-            const lastName = member.surname || '';
-            
+            const firstName = member.givenName || "";
+            const lastName = member.surname || "";
+
             // Extract phone number
-            let phoneNumber = '';
-            if (typeof member.phone === 'string') {
+            let phoneNumber = "";
+            if (typeof member.phone === "string") {
               phoneNumber = member.phone;
-            } else if (typeof member.phone === 'object' && member.phone) {
-              phoneNumber = member.phone.number || member.phone.e164 || '';
+            } else if (typeof member.phone === "object" && member.phone) {
+              phoneNumber = member.phone.number || member.phone.e164 || "";
             }
-            
+
             // Skip records without sufficient data
             if (!firstName || !lastName || !phoneNumber) {
               console.log(`Skipping member due to missing data`, {
                 firstName: !!firstName,
                 lastName: !!lastName,
-                phoneNumber: !!phoneNumber
+                phoneNumber: !!phoneNumber,
               });
               return;
             }
-            
+
             // Log the member we're about to track (with limited data for privacy)
-            console.log(`Tracking household head: ${firstName} ${lastName}`, 
-                        phoneNumber ? `phone ending in: ${phoneNumber.slice(-4)}` : 'no phone');
-            
+            console.log(
+              `Tracking household head: ${firstName} ${lastName}`,
+              phoneNumber
+                ? `phone ending in: ${phoneNumber.slice(-4)}`
+                : "no phone",
+            );
+
             // Track the anonymous user - adding unit number
-            const result = await trackAnonymousUser(firstName, lastName, phoneNumber, ward.unit_number);
-            
+            const result = await trackAnonymousUser(
+              firstName,
+              lastName,
+              phoneNumber,
+              ward.unit_number,
+            );
+
             if (result.success) {
               trackedUsers.push({ firstName, lastName, result });
               console.log(`Successfully tracked: ${firstName} ${lastName}`);
             } else {
-              console.warn(`Failed to track: ${firstName} ${lastName}`, result.error);
-              
+              console.warn(
+                `Failed to track: ${firstName} ${lastName}`,
+                result.error,
+              );
+
               // If the failure is due to a database error, retry once
-              if (result.error && typeof result.error === 'string' && 
-                  (result.error.includes('database') || result.error.includes('timeout'))) {
+              if (
+                result.error &&
+                typeof result.error === "string" &&
+                (result.error.includes("database") ||
+                  result.error.includes("timeout"))
+              ) {
                 console.log(`Retrying tracking for: ${firstName} ${lastName}`);
                 // Wait a bit before retrying
-                await new Promise(resolve => setTimeout(resolve, 1000));
-                
+                await new Promise((resolve) => setTimeout(resolve, 1000));
+
                 try {
-                  const retryResult = await trackAnonymousUser(firstName, lastName, phoneNumber, ward.unit_number);
+                  const retryResult = await trackAnonymousUser(
+                    firstName,
+                    lastName,
+                    phoneNumber,
+                    ward.unit_number,
+                  );
                   if (retryResult.success) {
-                    trackedUsers.push({ firstName, lastName, result: retryResult });
-                    console.log(`Successfully tracked on retry: ${firstName} ${lastName}`);
+                    trackedUsers.push({
+                      firstName,
+                      lastName,
+                      result: retryResult,
+                    });
+                    console.log(
+                      `Successfully tracked on retry: ${firstName} ${lastName}`,
+                    );
                   } else {
-                    console.error(`Failed to track even after retry: ${firstName} ${lastName}`, retryResult.error);
+                    console.error(
+                      `Failed to track even after retry: ${firstName} ${lastName}`,
+                      retryResult.error,
+                    );
                   }
                 } catch (retryErr) {
-                  console.error(`Error during retry: ${firstName} ${lastName}`, retryErr);
+                  console.error(
+                    `Error during retry: ${firstName} ${lastName}`,
+                    retryErr,
+                  );
                 }
               }
             }
           } catch (memberError) {
-            console.error('Error processing individual member:', memberError);
+            console.error("Error processing individual member:", memberError);
           }
         });
-        
+
         // Wait for all promises in the batch to complete
         await Promise.all(batchPromises);
-        
+
         // Add a delay between batches to avoid overwhelming the database
         if (i + batchSize < allMembers.length) {
-          console.log(`Batch ${i / batchSize + 1} complete, pausing before next batch...`);
-          await new Promise(resolve => setTimeout(resolve, 1000));
+          console.log(
+            `Batch ${i / batchSize + 1} complete, pausing before next batch...`,
+          );
+          await new Promise((resolve) => setTimeout(resolve, 1000));
         }
       }
-      
+
       // Final progress update to 100%
       setImportProgress(100);
-      
-      console.log(`Successfully tracked ${trackedUsers.length} household heads.`);
-      
+
+      console.log(
+        `Successfully tracked ${trackedUsers.length} household heads.`,
+      );
+
       // Log the import - include ward unit number
       await logWardDataImport(allMembers.length, ward.unit_number);
-      
+
       const trackedCount = {
         new: trackedUsers.length,
-        existing: 0
+        existing: 0,
       };
-      
+
       setTrackedUsers(trackedCount);
-      
+
       // Process the ward list import to update ward_branch_members
       try {
-        console.log(`Processing ward list import for ${ward.unit_number} (ward ID: ${selectedWard})`);
-        const processResult = await processWardListImport(ward.unit_number, selectedWard);
-        
+        console.log(
+          `Processing ward list import for ${ward.unit_number} (ward ID: ${selectedWard})`,
+        );
+        const processResult = await processWardListImport(
+          ward.unit_number,
+          selectedWard,
+        );
+
         if (processResult.success) {
           console.log("Successfully processed ward list import");
-          setMessage(`Successfully imported ${allMembers.length} contacts and updated ward memberships.`);
+          setMessage(
+            `Successfully imported ${allMembers.length} contacts and updated ward memberships.`,
+          );
         } else {
-          console.warn("Warning: Ward list import processed but ward memberships were not updated:", processResult.error);
-          setMessage(`Successfully imported ${allMembers.length} contacts, but there was an issue updating ward memberships.`);
+          console.warn(
+            "Warning: Ward list import processed but ward memberships were not updated:",
+            processResult.error,
+          );
+          setMessage(
+            `Successfully imported ${allMembers.length} contacts, but there was an issue updating ward memberships.`,
+          );
         }
       } catch (processError) {
         console.error("Error processing ward list import:", processError);
-        setMessage(`Successfully imported ${allMembers.length} contacts, but there was an error updating ward memberships.`);
+        setMessage(
+          `Successfully imported ${allMembers.length} contacts, but there was an error updating ward memberships.`,
+        );
       }
-      
+
       setSuccess(true);
-      
+
       // Save last import date to localStorage
-      localStorage.setItem('wardContactLastImport', new Date().toISOString());
-      
+      localStorage.setItem("wardContactLastImport", new Date().toISOString());
+
       setTimeout(() => {
         setSuccess(false);
         setImportProgress(null); // Reset progress
@@ -1305,7 +1502,7 @@ export default function ToolsPage() {
 
       // Move the debug output up, before batch processing
       console.log(`Found ${allMembers.length} household heads to process.`);
-      
+
       // Add a sample of the data we found for debugging
       if (allMembers.length > 0) {
         console.log("Sample of first household head found:");
@@ -1314,17 +1511,26 @@ export default function ToolsPage() {
           givenName: sample.givenName,
           surname: sample.surname,
           phoneType: typeof sample.phone,
-          phoneKeys: typeof sample.phone === 'object' ? Object.keys(sample.phone) : 'N/A',
-          hasPhoneNumber: typeof sample.phone === 'object' ? !!sample.phone.number : 'N/A',
-          hasE164: typeof sample.phone === 'object' ? !!sample.phone.e164 : 'N/A',
-          unitNumber: sample.unit_number
+          phoneKeys:
+            typeof sample.phone === "object"
+              ? Object.keys(sample.phone)
+              : "N/A",
+          hasPhoneNumber:
+            typeof sample.phone === "object" ? !!sample.phone.number : "N/A",
+          hasE164:
+            typeof sample.phone === "object" ? !!sample.phone.e164 : "N/A",
+          unitNumber: sample.unit_number,
         });
       } else {
         console.log("No household heads found. Check the data structure.");
       }
     } catch (error) {
-      console.error('Error processing JSON:', error);
-      setError(error instanceof Error ? error.message : "An unknown error occurred during import");
+      console.error("Error processing JSON:", error);
+      setError(
+        error instanceof Error
+          ? error.message
+          : "An unknown error occurred during import",
+      );
     } finally {
       setLoading(false);
     }
@@ -1353,12 +1559,14 @@ export default function ToolsPage() {
       if (authError) {
         return (
           <div className="space-y-6">
-             <h1 className="text-3xl font-bold">Ward Contact Import Tool</h1>
+            <h1 className="text-3xl font-bold">Ward Contact Import Tool</h1>
             <div className="bg-amber-50 text-amber-800 p-6 rounded-lg border border-amber-200">
-              <h2 className="text-xl font-medium mb-2">Authentication Required</h2>
+              <h2 className="text-xl font-medium mb-2">
+                Authentication Required
+              </h2>
               <p className="mb-4">You need to be logged in to use this tool.</p>
               <button
-                onClick={() => router.push('/auth/login')}
+                onClick={() => router.push("/auth/login")}
                 className="bg-primary text-primary-foreground hover:bg-primary/90 px-4 py-2 rounded-md text-sm font-medium"
               >
                 Go to Login
@@ -1372,18 +1580,21 @@ export default function ToolsPage() {
       if (!loadingWards && wardBranches.length === 0) {
         return (
           <div className="space-y-6">
-             <h1 className="text-3xl font-bold">Ward Contact Import Tool</h1>
+            <h1 className="text-3xl font-bold">Ward Contact Import Tool</h1>
             <div className="bg-amber-50 text-amber-800 p-6 rounded-lg border border-amber-200">
-              <h2 className="text-xl font-medium mb-2">No Wards or Branches Found</h2>
+              <h2 className="text-xl font-medium mb-2">
+                No Wards or Branches Found
+              </h2>
               <div className="flex items-start gap-3 mb-4">
                 <AlertCircle className="w-5 h-5 mt-0.5 flex-shrink-0" />
                 <p>
-                  You need to set up at least one ward or branch before using this tool. 
-                  Please go to Settings to add your ward or branch information.
+                  You need to set up at least one ward or branch before using
+                  this tool. Please go to Settings to add your ward or branch
+                  information.
                 </p>
               </div>
-              <button 
-                onClick={() => router.push('/app/settings')}
+              <button
+                onClick={() => router.push("/app/settings")}
                 className="bg-primary text-primary-foreground hover:bg-primary/90 px-4 py-2 rounded-md text-sm font-medium"
               >
                 Go to Settings
@@ -1396,17 +1607,20 @@ export default function ToolsPage() {
       // Render the main tool content if authenticated and wards exist
       return (
         <div className="space-y-6">
-           <h1 className="text-3xl font-bold">Ward Contact Import Tool</h1>
+          <h1 className="text-3xl font-bold">Ward Contact Import Tool</h1>
 
           <div className="bg-card rounded-lg border p-6 mb-6">
             <h2 className="text-xl font-medium mb-4">Data Privacy Notice</h2>
             <p className="mb-3 text-muted-foreground">
-              The data you import is <strong>stored locally on your device</strong> and is not shared with anyone.
-              It's used only for coordinating ward cleaning assignments within this application.
+              The data you import is{" "}
+              <strong>stored locally on your device</strong> and is not shared
+              with anyone. It's used only for coordinating ward cleaning
+              assignments within this application.
             </p>
             <p className="mb-3 text-muted-foreground">
-              For tracking purposes only, a secure, anonymous hash of partial contact information is stored in the database.
-              No personally identifiable information is retained in this process.
+              For tracking purposes only, a secure, anonymous hash of partial
+              contact information is stored in the database. No personally
+              identifiable information is retained in this process.
             </p>
 
             {lastImportDate && (
@@ -1418,10 +1632,15 @@ export default function ToolsPage() {
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             <div className="bg-card rounded-lg border p-6 lg:col-span-7">
-              <h2 className="text-xl font-medium mb-6">Step-by-Step Instructions</h2>
+              <h2 className="text-xl font-medium mb-6">
+                Step-by-Step Instructions
+              </h2>
 
               <div className="mb-6">
-                <label htmlFor="selectedWard" className="block text-sm font-medium mb-2">
+                <label
+                  htmlFor="selectedWard"
+                  className="block text-sm font-medium mb-2"
+                >
                   Select a Ward/Branch
                 </label>
                 {/* Loading state handled above, directly render select */}
@@ -1432,9 +1651,10 @@ export default function ToolsPage() {
                   className="w-full px-3 py-2 border rounded-md bg-background" // Added bg-background
                   disabled={wardBranches.length === 0 || loading} // Disable during import loading too
                 >
-                  {wardBranches.map(ward => (
+                  {wardBranches.map((ward) => (
                     <option key={ward.id} value={ward.id}>
-                      {ward.name}{ward.is_primary ? ' (Primary)' : ''}
+                      {ward.name}
+                      {ward.is_primary ? " (Primary)" : ""}
                     </option>
                   ))}
                 </select>
@@ -1457,7 +1677,15 @@ export default function ToolsPage() {
                 title="Open Developer Tools"
                 description={
                   <div>
-                    Press <code className="bg-muted px-1 py-0.5 rounded">Ctrl + Shift + I</code> (or <code className="bg-muted px-1 py-0.5 rounded">Cmd + Option + I</code> on Mac) to open developer tools.
+                    Press{" "}
+                    <code className="bg-muted px-1 py-0.5 rounded">
+                      Ctrl + Shift + I
+                    </code>{" "}
+                    (or{" "}
+                    <code className="bg-muted px-1 py-0.5 rounded">
+                      Cmd + Option + I
+                    </code>{" "}
+                    on Mac) to open developer tools.
                   </div>
                 }
               />
@@ -1467,7 +1695,12 @@ export default function ToolsPage() {
                 title="Enable Pasting"
                 description={
                   <div>
-                    Click on the Console tab, type <code className="bg-muted px-1 py-0.5 rounded">allow pasting</code> and press Enter. You might need to do this each time you open the console.
+                    Click on the Console tab, type{" "}
+                    <code className="bg-muted px-1 py-0.5 rounded">
+                      allow pasting
+                    </code>{" "}
+                    and press Enter. You might need to do this each time you
+                    open the console.
                   </div>
                 }
               />
@@ -1477,11 +1710,19 @@ export default function ToolsPage() {
                 title="Run Script"
                 description={
                   <div>
-                    <p className="mb-3">Copy and paste the following script (updated for your selected ward) into the console and press Enter:</p>
-                    <div className="w-full overflow-hidden" style={{ maxWidth: "100%" }}>
+                    <p className="mb-3">
+                      Copy and paste the following script (updated for your
+                      selected ward) into the console and press Enter:
+                    </p>
+                    <div
+                      className="w-full overflow-hidden"
+                      style={{ maxWidth: "100%" }}
+                    >
                       <CodeBlock code={scriptCode} />
                     </div>
-                     <p className="text-xs text-muted-foreground mt-2">This will download a file named like YYYY-MM-DD.json.</p>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      This will download a file named like YYYY-MM-DD.json.
+                    </p>
                   </div>
                 }
               />
@@ -1497,7 +1738,12 @@ export default function ToolsPage() {
               <h2 className="text-xl font-medium mb-4">Import Ward Contacts</h2>
 
               <div className="mb-6">
-                <label htmlFor="fileInput" className="block text-sm font-medium mb-2">Select the downloaded JSON file</label>
+                <label
+                  htmlFor="fileInput"
+                  className="block text-sm font-medium mb-2"
+                >
+                  Select the downloaded JSON file
+                </label>
                 <input
                   id="fileInput"
                   type="file"
@@ -1520,7 +1766,9 @@ export default function ToolsPage() {
                           style={{ width: `${importProgress}%` }}
                         ></div>
                       </div>
-                      <p className="text-xs text-center mt-1">{importProgress}% Complete</p>
+                      <p className="text-xs text-center mt-1">
+                        {importProgress}% Complete
+                      </p>
                     </div>
                   )}
                   <p className="text-sm mt-2">Importing contacts...</p>
@@ -1531,24 +1779,26 @@ export default function ToolsPage() {
                   disabled={!file || !selectedWard || loadingWards || authError} // More robust disabled check
                   className={`w-full px-4 py-2 rounded-md text-sm font-medium text-white transition-colors ${
                     !file || !selectedWard || loadingWards || authError
-                      ? 'bg-primary/50 cursor-not-allowed'
-                      : 'bg-primary hover:bg-primary/90'
+                      ? "bg-primary/50 cursor-not-allowed"
+                      : "bg-primary hover:bg-primary/90"
                   }`}
                 >
                   Import Contacts
                 </button>
               )}
 
-              {success && message && ( // Check for message content too
-                <div className="mt-4 p-3 bg-green-100 text-green-700 rounded-md">
-                  <p>{message}</p>
-                  {(trackedUsers.new > 0) && ( // Simplified display
-                    <p className="text-xs mt-1">
-                      {trackedUsers.new} household head{trackedUsers.new !== 1 ? 's' : ''} tracked.
-                    </p>
-                  )}
-                </div>
-              )}
+              {success &&
+                message && ( // Check for message content too
+                  <div className="mt-4 p-3 bg-green-100 text-green-700 rounded-md">
+                    <p>{message}</p>
+                    {trackedUsers.new > 0 && ( // Simplified display
+                      <p className="text-xs mt-1">
+                        {trackedUsers.new} household head
+                        {trackedUsers.new !== 1 ? "s" : ""} tracked.
+                      </p>
+                    )}
+                  </div>
+                )}
             </div>
           </div>
         </div>
@@ -1557,7 +1807,7 @@ export default function ToolsPage() {
 
     if (activeTool === "Task Builder") {
       return (
-        <TaskBuilderTool 
+        <TaskBuilderTool
           wardBranches={wardBranches}
           selectedWard={selectedWard}
           authError={authError}
@@ -1569,33 +1819,33 @@ export default function ToolsPage() {
     return <div>Select a tool from the menu.</div>;
   };
 
-
   return (
-     <div className="space-y-6">
+    <div className="space-y-6">
       <h1 className="text-3xl font-bold">Tools</h1> {/* Main page title */}
-
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         {/* Tool Navigation */}
         <div className="md:col-span-1">
-          <nav className="bg-card rounded-lg border overflow-hidden sticky top-20"> {/* Added sticky top */}
+          <nav className="bg-card rounded-lg border overflow-hidden sticky top-20">
+            {" "}
+            {/* Added sticky top */}
             <div className="p-2">
               {tools.map((tool) => (
                 <button
                   key={tool.name}
                   className={`w-full text-left px-3 py-2 rounded-md text-sm font-medium transition-colors ${
                     activeTool === tool.name
-                      ? 'bg-primary/10 text-primary'
-                      : 'text-foreground hover:bg-muted' // Ensure text color contrast
+                      ? "bg-primary/10 text-primary"
+                      : "text-foreground hover:bg-muted" // Ensure text color contrast
                   }`}
                   onClick={() => {
-                     setActiveTool(tool.name);
-                     // Reset tool-specific states if necessary when switching
-                     setError(null);
-                     setSuccess(false);
-                     setMessage('');
-                     setFile(null);
-                     setImportProgress(null);
-                     // Don't reset ward selection or list
+                    setActiveTool(tool.name);
+                    // Reset tool-specific states if necessary when switching
+                    setError(null);
+                    setSuccess(false);
+                    setMessage("");
+                    setFile(null);
+                    setImportProgress(null);
+                    // Don't reset ward selection or list
                   }}
                 >
                   {tool.name}
@@ -1606,10 +1856,8 @@ export default function ToolsPage() {
         </div>
 
         {/* Tool Content Area */}
-        <div className="md:col-span-3 space-y-6">
-          {renderToolContent()}
-        </div>
+        <div className="md:col-span-3 space-y-6">{renderToolContent()}</div>
       </div>
     </div>
   );
-} 
+}
