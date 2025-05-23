@@ -484,31 +484,28 @@ export default function AuthenticatedLayout({
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
       >
-        {/* Mobile only - Sidebar Header with Close Button */}
-        {isMobile && (
-          <div className="flex items-center justify-end p-2 border-b h-12">
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              onClick={() => setIsSidebarOpen(false)}
-              className="h-8 w-8 md:hidden"
-            >
-              <X size={18} />
-            </Button>
-          </div>
-        )}
-          
         {/* Sidebar Content */}
+        
         <div className={`flex-1 py-4 ${scrollbarClass}`}>
           {/* Members Section */}
           <div className="mb-6 relative">
             <div className={`
-              transition-opacity duration-200 h-6 px-4 mb-2
+              transition-opacity duration-200 h-6 px-4 mb-2 flex items-center justify-between
               ${sidebarIsExpanded ? 'opacity-100' : 'opacity-0'}
             `}>
               <h3 className="text-xs font-semibold text-muted-foreground tracking-wider uppercase">
                 Members
               </h3>
+              {isMobile && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setIsSidebarOpen(false)}
+                  className="h-6 w-6 md:hidden"
+                >
+                  <X size={14} />
+                </Button>
+              )}
             </div>
             <div className="space-y-1">
               {memberItems.map(renderNavItem)}
