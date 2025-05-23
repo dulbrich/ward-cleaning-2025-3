@@ -921,7 +921,7 @@ export default function SchedulePage() {
       
       {/* Generate Schedule Dialog */}
       <Dialog open={showScheduleDialog} onOpenChange={setShowScheduleDialog}>
-        <DialogContent className="max-w-md w-[95vw] sm:w-full">
+        <DialogContent className="max-w-md w-[95vw] sm:w-full max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Generate Cleaning Schedule</DialogTitle>
             <DialogDescription>
@@ -982,7 +982,7 @@ export default function SchedulePage() {
       
       {/* Edit Schedule Dialog */}
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-        <DialogContent className="max-w-md w-[95vw] sm:w-full">
+        <DialogContent className="max-w-md w-[95vw] sm:w-full max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit Cleaning Day</DialogTitle>
           </DialogHeader>
@@ -1085,7 +1085,7 @@ export default function SchedulePage() {
       
       {/* Delete Schedule Confirmation Dialog */}
       <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <DialogContent className="max-w-md w-[95vw] sm:w-full">
+        <DialogContent className="max-w-md w-[95vw] sm:w-full max-h-[90vh] overflow-y-auto">
           <DialogHeader className="space-y-3">
             <AlertTriangle className="w-12 h-12 text-red-500 mx-auto" />
             <DialogTitle className="text-center">Delete Cleaning Schedule</DialogTitle>
@@ -1127,7 +1127,7 @@ export default function SchedulePage() {
       
       {/* Clear All Schedules Confirmation Dialog */}
       <Dialog open={showClearAllDialog} onOpenChange={setShowClearAllDialog}>
-        <DialogContent className="max-w-md w-[95vw] sm:w-full">
+        <DialogContent className="max-w-md w-[95vw] sm:w-full max-h-[90vh] overflow-y-auto">
           <DialogHeader className="space-y-3">
             <AlertTriangle className="w-12 h-12 text-red-500 mx-auto" />
             <DialogTitle className="text-center">Clear All Schedules</DialogTitle>
