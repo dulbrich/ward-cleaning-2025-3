@@ -18,6 +18,7 @@ interface UserProfile {
   is_phone_verified: boolean;
   avatar_url: string;
   role: string;
+  sms_opt_in: boolean;
 }
 
 // Define Ward/Branch interface
@@ -55,6 +56,7 @@ export default function SettingsPage() {
     is_primary: false
   });
   const [showUnitNumberHelp, setShowUnitNumberHelp] = useState(false);
+  const [smsOptIn, setSmsOptIn] = useState(false);
 
   // Fetch actual user data on component mount
   useEffect(() => {
@@ -66,13 +68,16 @@ export default function SettingsPage() {
         if (response.ok) {
           const data = await response.json();
           setUserData(data);
+          setSmsOptIn(data.sms_opt_in ?? false);
           console.log("Loaded user data:", data); // Add logging to verify data is fetched
         } else {
           console.error("Error fetching profile: Response not OK"); // Log error response
           // Fallback to session data or local storage if available
           const storedUser = sessionStorage.getItem('user');
           if (storedUser) {
-            setUserData(JSON.parse(storedUser));
+            const parsed = JSON.parse(storedUser);
+            setUserData(parsed);
+            setSmsOptIn(parsed.sms_opt_in ?? false);
           } else {
             // Use default mock data as last resort
             setUserData({
@@ -84,8 +89,10 @@ export default function SettingsPage() {
               phone_number: "",
               is_phone_verified: false,
               avatar_url: "/images/avatars/default.png",
-              role: "user"
+              role: "user",
+              sms_opt_in: false
             });
+            setSmsOptIn(false);
           }
         }
       } catch (error) {
@@ -143,6 +150,24 @@ export default function SettingsPage() {
       ...wardBranchFormData,
       [name]: processedValue
     });
+  };
+
+  const handleSmsToggle = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const checked = e.target.checked;
+    setSmsOptIn(checked);
+    try {
+      const response = await fetch('/api/user/profile', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sms_opt_in: checked })
+      });
+      if (!response.ok) throw new Error('Failed');
+      toast.success('SMS preference updated');
+    } catch (err) {
+      console.error('Error updating SMS preference', err);
+      toast.error('Failed to update preference');
+      setSmsOptIn(!checked);
+    }
   };
 
   // Save ward/branch form data
@@ -704,7 +729,12 @@ export default function SettingsPage() {
                     <p className="text-sm text-muted-foreground">Receive text messages for urgent requests</p>
                   </div>
                   <label className="relative inline-flex items-center cursor-pointer">
-                    <input type="checkbox" className="sr-only peer" />
+                    <input
+                      type="checkbox"
+                      className="sr-only peer"
+                      checked={smsOptIn}
+                      onChange={handleSmsToggle}
+                    />
                     <div className="w-11 h-6 bg-muted rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
                   </label>
                 </div>

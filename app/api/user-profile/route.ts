@@ -29,6 +29,8 @@ export async function POST(request: NextRequest) {
         phone_number: profileData.phoneNumber,
         is_phone_verified: profileData.isPhoneVerified,
         has_accepted_terms: profileData.hasAcceptedTerms,
+        sms_opt_in: profileData.smsOptIn,
+        sms_opt_in_at: profileData.smsOptIn ? new Date().toISOString() : null,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       })

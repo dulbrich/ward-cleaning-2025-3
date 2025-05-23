@@ -27,7 +27,8 @@ const fallbackUserData = {
   phone_number: "8019719802",
   is_phone_verified: true,
   avatar_url: "/images/avatars/avatar1.png",
-  role: "Admin"
+  role: "Admin",
+  sms_opt_in: false
 };
 
 // Helper function to add CORS headers
@@ -100,7 +101,8 @@ export async function GET() {
       phone_number: data.phone_number,
       is_phone_verified: data.is_phone_verified,
       avatar_url: data.avatar_url,
-      role: data.role
+      role: data.role,
+      sms_opt_in: data.sms_opt_in
     };
     
     // Format the phone number for response
@@ -135,7 +137,8 @@ export async function PUT(request: Request) {
       last_name: data.last_name,
       username: data.username,
       phone_number: data.phone_number,
-      avatar_url: data.avatar_url?.substring(0, 30) + "..." // Truncate for logging
+      avatar_url: data.avatar_url?.substring(0, 30) + "...", // Truncate for logging
+      sms_opt_in: data.sms_opt_in
     });
     
     // Validate required fields
@@ -229,6 +232,8 @@ export async function PUT(request: Request) {
           avatar_url: data.avatar_url,
           phone_number: cleanedPhoneNumber,
           is_phone_verified: isPhoneVerified,
+          sms_opt_in: data.sms_opt_in,
+          sms_opt_in_at: data.sms_opt_in ? new Date().toISOString() : null,
           updated_at: new Date().toISOString()
         })
         .select("id")
@@ -253,6 +258,8 @@ export async function PUT(request: Request) {
         avatar_url: data.avatar_url,
         phone_number: cleanedPhoneNumber,
         is_phone_verified: isPhoneVerified,
+        sms_opt_in: data.sms_opt_in,
+        sms_opt_in_at: data.sms_opt_in ? new Date().toISOString() : null,
         updated_at: new Date().toISOString()
       };
       
@@ -300,6 +307,7 @@ export async function PUT(request: Request) {
       is_phone_verified: updatedProfile.is_phone_verified,
       avatar_url: updatedProfile.avatar_url,
       role: updatedProfile.role,
+      sms_opt_in: updatedProfile.sms_opt_in,
       // Include user_hash in the log but not in the response
       // user_hash: updatedProfile.user_hash
     };
