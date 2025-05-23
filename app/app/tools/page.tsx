@@ -6,7 +6,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { createClient } from "@/utils/supabase/client";
-import { AlertCircle, AlertTriangle, ChevronRight, ClipboardList, Edit, FileText, Loader2, MoreHorizontal, Plus, RefreshCw, Search, Trash2 } from "lucide-react";
+import { AlertCircle, AlertTriangle, ChevronRight, ClipboardList, Edit, FileText, Loader2, MoreHorizontal, Plus, RefreshCw, Search, Trash2, ChevronsUpDown } from "lucide-react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -858,6 +858,33 @@ function TaskBuilderTool({ wardBranches, selectedWard, authError }: {
   );
 }
 
+// Simple prototype for adjusting cleaning assignments
+function WardAssignmentsTool() {
+  const groups = ["A", "B", "C", "D"];
+  const counts = [5, 5, 5, 5]; // placeholder household counts
+
+  return (
+    <div className="space-y-6">
+      <h1 className="text-3xl font-bold">Adjust Cleaning Assignments</h1>
+      <div className="flex justify-center">
+        <div className="relative w-32 h-96 border rounded-md overflow-hidden flex flex-col divide-y">
+          {groups.map((g, idx) => (
+            <div key={g} className="relative flex-1 flex items-center justify-center">
+              <span className="absolute top-1 left-1 text-sm font-medium">{g}</span>
+              <span className="text-2xl font-bold">{counts[idx]}</span>
+              {idx < groups.length - 1 && (
+                <button className="absolute -bottom-3 left-1/2 -translate-x-1/2 bg-background border rounded-full p-1 shadow">
+                  <ChevronsUpDown className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function ToolsPage() {
   const [activeTool, setActiveTool] = useState("Ward Contact Import");
   const [file, setFile] = useState<File | null>(null);
@@ -1334,6 +1361,7 @@ export default function ToolsPage() {
   const tools = [
     { name: "Ward Contact Import" },
     { name: "Task Builder" },
+    { name: "Ward Assignments" },
     // Add more tools here later
   ];
 
@@ -1557,12 +1585,16 @@ export default function ToolsPage() {
 
     if (activeTool === "Task Builder") {
       return (
-        <TaskBuilderTool 
+        <TaskBuilderTool
           wardBranches={wardBranches}
           selectedWard={selectedWard}
           authError={authError}
         />
       );
+    }
+
+    if (activeTool === "Ward Assignments") {
+      return <WardAssignmentsTool />;
     }
 
     // Default case if no tool matches (shouldn't happen with current setup)
