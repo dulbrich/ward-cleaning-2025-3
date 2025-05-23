@@ -53,7 +53,11 @@ export function TermsStep({ formData, updateFormData }: TermsStepProps) {
             <li>
               The app may send notifications related to cleaning duties and important updates to users.
             </li>
-            
+
+            <li>
+              Verifying your phone number enrolls you in recurring automated texts. Message frequency may vary. Reply STOP to opt out at any time. Standard rates may apply.
+            </li>
+
             <li>
               The Ward Cleaning App is not affiliated with any specific religious organization and is independently operated.
             </li>
