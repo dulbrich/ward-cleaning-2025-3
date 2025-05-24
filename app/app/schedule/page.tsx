@@ -1,31 +1,33 @@
 "use client";
 
 import {
-    Button,
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-    Popover,
-    PopoverContent,
-    PopoverTrigger,
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-    Tabs,
-    TabsList,
-    TabsTrigger
+  Button,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  Tabs,
+  TabsList,
+  TabsTrigger
 } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/utils/supabase/client";
 import { addMonths, eachDayOfInterval, endOfMonth, format, isSameMonth, parse, parseISO, startOfMonth } from "date-fns";
-import { AlertTriangle, ArrowLeft, ArrowRight, CalendarIcon, Clock, Copy, List, Mail, MoreHorizontal, Plus, Trash2 } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ArrowRight, CalendarIcon, Clock, Copy, List, Mail, MoreHorizontal, Plus, Settings, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
+import GroupAssignmentVisualizer from "../../components/GroupAssignmentVisualizer";
+import ParticipationModal from "../../components/ParticipationModal";
 
 // Types
 interface WardBranch {
@@ -223,7 +225,7 @@ export default function SchedulePage() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [calendarDays, setCalendarDays] = useState<ScheduleDay[]>([]);
   const [wardMembers, setWardMembers] = useState<WardMember[]>([]);
-  const [activeView, setActiveView] = useState<"calendar" | "list" | "text">("calendar");
+  const [activeView, setActiveView] = useState<"calendar" | "list" | "text" | "edit">("calendar");
   
   // Dialog states
   const [showScheduleDialog, setShowScheduleDialog] = useState(false);
@@ -232,6 +234,14 @@ export default function SchedulePage() {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showClearAllDialog, setShowClearAllDialog] = useState(false);
   const [scheduleToDelete, setScheduleToDelete] = useState<CleaningSchedule | null>(null);
+  
+  // Edit tab states
+  const [showParticipationModal, setShowParticipationModal] = useState(false);
+  const [selectedGroup, setSelectedGroup] = useState<'A' | 'B' | 'C' | 'D' | null>(null);
+  const [selectedGroupMembers, setSelectedGroupMembers] = useState<WardMember[]>([]);
+  const [customGroupAssignments, setCustomGroupAssignments] = useState<Map<string, string>>(new Map());
+  const [loadingGroupAssignments, setLoadingGroupAssignments] = useState(false);
+  const [savingGroupAssignments, setSavingGroupAssignments] = useState(false);
   
   // Schedule generation form
   const [months, setMonths] = useState<string[]>([]);
@@ -260,7 +270,7 @@ export default function SchedulePage() {
         if (branchData && branchData.length > 0) {
           setWardBranches(branchData);
           // Select primary ward by default
-          const primaryWard = branchData.find(ward => ward.is_primary);
+          const primaryWard = branchData.find((ward: WardBranch) => ward.is_primary);
           setSelectedBranch(primaryWard?.id || branchData[0].id);
         }
         
@@ -407,6 +417,7 @@ export default function SchedulePage() {
                 lastName,
                 phone: phoneNumber,
                 email,
+                userHash: `${firstName}_${lastName}_${phoneNumber}`.replace(/\s+/g, '_').toLowerCase(),
                 group
               });
             });
@@ -838,6 +849,145 @@ export default function SchedulePage() {
     }
   };
 
+  // Group assignment functions for Edit tab
+  const loadCustomGroupAssignments = async () => {
+    if (!selectedBranch) return;
+    
+    setLoadingGroupAssignments(true);
+    try {
+      const response = await fetch(`/api/ward-members/groups/${selectedBranch}`);
+      const data = await response.json();
+      
+      if (data.success && data.data.customAssignments) {
+        const assignmentMap = new Map<string, string>();
+        data.data.customAssignments.forEach((assignment: any) => {
+          assignmentMap.set(assignment.user_hash, assignment.assigned_group);
+        });
+        setCustomGroupAssignments(assignmentMap);
+      }
+    } catch (error) {
+      console.error("Error loading group assignments:", error);
+      toast.error("Failed to load group assignments");
+    } finally {
+      setLoadingGroupAssignments(false);
+    }
+  };
+
+  const handleGroupChange = async (userHash: string, newGroup: string, householdId: string) => {
+    if (!selectedBranch) return;
+    
+    // Update local state immediately
+    const updatedAssignments = new Map(customGroupAssignments);
+    updatedAssignments.set(userHash, newGroup);
+    setCustomGroupAssignments(updatedAssignments);
+    
+    // Update ward members with new group assignments
+    const updatedMembers = wardMembers.map(member => {
+      if (member.userHash === userHash) {
+        return { ...member, group: newGroup };
+      }
+      return member;
+    });
+    setWardMembers(updatedMembers);
+    
+    // Save to database
+    try {
+      setSavingGroupAssignments(true);
+      
+      const response = await fetch('/api/ward-members/groups/bulk-update', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          wardBranchId: selectedBranch,
+          assignments: [{
+            userHash,
+            newGroup: newGroup as 'A' | 'B' | 'C' | 'D',
+            householdId
+          }]
+        }),
+      });
+
+      const data = await response.json();
+      
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to update group assignment');
+      }
+      
+      toast.success("Group assignment updated successfully");
+    } catch (error) {
+      console.error("Error updating group assignment:", error);
+      toast.error("Failed to update group assignment");
+      
+      // Revert local changes on error
+      setCustomGroupAssignments(customGroupAssignments);
+      setWardMembers(wardMembers);
+    } finally {
+      setSavingGroupAssignments(false);
+    }
+  };
+
+  const handleViewParticipants = (group: 'A' | 'B' | 'C' | 'D', members: WardMember[]) => {
+    setSelectedGroup(group);
+    setSelectedGroupMembers(members);
+    setShowParticipationModal(true);
+  };
+
+  // Get ward members with custom group assignments applied
+  const getWardMembersWithCustomGroups = () => {
+    return wardMembers.map(member => {
+      const customGroup = customGroupAssignments.get(member.userHash || '');
+      return {
+        ...member,
+        group: customGroup || member.group
+      };
+    });
+  };
+
+  // Load custom group assignments when selectedBranch changes
+  useEffect(() => {
+    if (selectedBranch && activeView === 'edit') {
+      loadCustomGroupAssignments();
+    }
+  }, [selectedBranch, activeView]);
+
+  // Render edit view
+  const renderEditView = () => {
+    const membersWithCustomGroups = getWardMembersWithCustomGroups();
+    
+    return (
+      <div className="space-y-6">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold mb-2">Group Assignment Editor</h2>
+          <p className="text-muted-foreground">
+            Adjust cleaning group assignments by dragging the boundaries. Households will stay together.
+          </p>
+        </div>
+        
+        {loadingGroupAssignments ? (
+          <div className="flex justify-center items-center h-[400px]">
+            <div className="animate-spin h-6 w-6 border-2 border-primary rounded-full border-t-transparent"></div>
+            <span className="ml-2">Loading group assignments...</span>
+          </div>
+        ) : (
+          <GroupAssignmentVisualizer
+            wardMembers={membersWithCustomGroups}
+            wardBranchId={selectedBranch || ''}
+            onGroupChange={handleGroupChange}
+            onViewParticipants={handleViewParticipants}
+          />
+        )}
+        
+        {savingGroupAssignments && (
+          <div className="fixed bottom-4 right-4 bg-primary text-primary-foreground px-4 py-2 rounded-md shadow-lg">
+            Saving changes...
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-6">
       {/* Make header section more responsive with flex-col on small screens */}
@@ -862,6 +1012,10 @@ export default function SchedulePage() {
               <TabsTrigger value="text" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                 <Mail className="h-4 w-4 mr-2" />
                 Text
+              </TabsTrigger>
+              <TabsTrigger value="edit" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                <Settings className="h-4 w-4 mr-2" />
+                Edit
               </TabsTrigger>
             </TabsList>
           </Tabs>
@@ -915,6 +1069,7 @@ export default function SchedulePage() {
             {activeView === "calendar" && renderCalendarView()}
             {activeView === "list" && renderListView()}
             {activeView === "text" && renderTextView()}
+            {activeView === "edit" && renderEditView()}
           </div>
         </>
       )}
@@ -1159,6 +1314,15 @@ export default function SchedulePage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      
+      {/* Participation Modal */}
+      <ParticipationModal
+        group={selectedGroup || 'A'}
+        members={selectedGroupMembers}
+        wardBranchId={selectedBranch || ''}
+        isOpen={showParticipationModal}
+        onClose={() => setShowParticipationModal(false)}
+      />
     </div>
   );
 } 

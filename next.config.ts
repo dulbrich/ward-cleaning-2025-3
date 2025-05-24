@@ -23,11 +23,6 @@ const nextConfig: NextConfig = {
   },
   // Use production mode with server-side rendering
   output: 'standalone',
-  // Complete disable static optimization
-  experimental: {
-    // This actually turns off static optimization
-    appDocumentPreloading: false,
-  },
   // Config for external packages
   serverExternalPackages: ['@sentry/nextjs'],
   // Force all pages to be server-side rendered

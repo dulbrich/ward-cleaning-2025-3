@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import Link from "next/link";
 import { Suspense } from "react";
-import { SmtpMessage } from "../smtp-message";
+import { SmtpMessage } from "../(auth-pages)/smtp-message";
 
 // Import useSearchParams inside the client component
 import { useSearchParams } from "next/navigation";
@@ -85,4 +85,4 @@ export default function ForgotPassword() {
       <ForgotPasswordContent />
     </Suspense>
   );
-}
+} 
