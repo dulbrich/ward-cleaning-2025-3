@@ -7,11 +7,11 @@ import { useEffect, useState } from "react";
 import UpcomingCleaningEvents from "@/components/dashboard/upcoming-cleaning-events";
 
 // Client component for checking local storage
-export default function ClientProfile({ 
-  user, 
-  serverProfile, 
-  searchParamsMessage 
-}: { 
+export default function ClientProfile({
+  user,
+  serverProfile,
+  searchParamsMessage,
+}: {
   user: any;
   serverProfile: any;
   searchParamsMessage: Message | null;
@@ -21,10 +21,32 @@ export default function ClientProfile({
   const [hasPendingProfile, setHasPendingProfile] = useState(false);
   const [pendingProfileData, setPendingProfileData] = useState<any>(null);
 
+  const defaultOrder = ["contact", "status", "upcoming"];
+  const [sectionsOrder, setSectionsOrder] = useState<string[]>(defaultOrder);
+  const [draggedSection, setDraggedSection] = useState<string | null>(null);
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem("profileSectionsOrder");
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed)) {
+          setSectionsOrder(parsed);
+        }
+      }
+    } catch (error) {
+      console.error("Error loading section order:", error);
+    }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem("profileSectionsOrder", JSON.stringify(sectionsOrder));
+  }, [sectionsOrder]);
+
   // Check for pending profile data in local storage
   useEffect(() => {
     try {
-      const storedData = localStorage.getItem('pendingProfileData');
+      const storedData = localStorage.getItem("pendingProfileData");
       if (storedData) {
         const parsedData = JSON.parse(storedData);
         setHasPendingProfile(true);
@@ -39,43 +61,70 @@ export default function ClientProfile({
   const applyPendingProfile = async () => {
     try {
       if (!pendingProfileData) return;
-      
+
       // Clear message
       setMessage(null);
-      
+
       // Show loading message
       setMessage({ message: "Applying your profile data..." });
-      
+
       // Construct form data from pending profile
       const formData = new FormData();
-      formData.append('pendingProfileData', JSON.stringify(pendingProfileData));
-      
+      formData.append("pendingProfileData", JSON.stringify(pendingProfileData));
+
       // Submit to apply pending profile API
-      const response = await fetch('/api/user-profile/apply-pending', {
-        method: 'POST',
-        body: formData
+      const response = await fetch("/api/user-profile/apply-pending", {
+        method: "POST",
+        body: formData,
       });
-      
+
       if (response.ok) {
         // Remove pending data
-        localStorage.removeItem('pendingProfileData');
+        localStorage.removeItem("pendingProfileData");
         setHasPendingProfile(false);
-        
+
         const result = await response.json();
-        
+
         // Show success message
-        setMessage({ success: result.message || "Your profile has been created successfully!" });
-        
+        setMessage({
+          success:
+            result.message || "Your profile has been created successfully!",
+        });
+
         // Refresh the page to show the new profile
         window.location.reload();
       } else {
         const errorData = await response.json();
-        setMessage({ error: errorData.error || "Failed to apply your profile data. Please try again." });
+        setMessage({
+          error:
+            errorData.error ||
+            "Failed to apply your profile data. Please try again.",
+        });
       }
     } catch (error) {
       console.error("Error applying pending profile:", error);
       setMessage({ error: "An error occurred while applying your profile." });
     }
+  };
+
+  const handleDragStart = (id: string) => () => {
+    setDraggedSection(id);
+  };
+
+  const handleDragOver =
+    (id: string) => (e: React.DragEvent<HTMLDivElement>) => {
+      e.preventDefault();
+      if (!draggedSection || draggedSection === id) return;
+      setSectionsOrder((prev) => {
+        const newOrder = prev.filter((sec) => sec !== draggedSection);
+        const index = newOrder.indexOf(id);
+        newOrder.splice(index, 0, draggedSection);
+        return [...newOrder];
+      });
+    };
+
+  const handleDrop = () => {
+    setDraggedSection(null);
   };
 
   return (
@@ -87,14 +136,14 @@ export default function ClientProfile({
           </div>
         )}
       </div>
-      
+
       <div className="flex flex-col gap-6">
         <h2 className="font-bold text-2xl">Your Profile</h2>
-        
+
         <div className="flex items-center gap-4">
           {profile?.avatar_url ? (
             <div className="relative h-20 w-20 rounded-full overflow-hidden border-2 border-primary">
-              <Image 
+              <Image
                 src={profile.avatar_url}
                 alt="Your avatar"
                 fill
@@ -103,14 +152,16 @@ export default function ClientProfile({
             </div>
           ) : (
             <div className="h-20 w-20 rounded-full bg-muted flex items-center justify-center text-muted-foreground text-xl">
-              {user.email?.charAt(0).toUpperCase() || 'U'}
+              {user.email?.charAt(0).toUpperCase() || "U"}
             </div>
           )}
-          
+
           <div>
             {profile ? (
               <>
-                <h3 className="text-xl font-semibold">{profile.first_name} {profile.last_name}</h3>
+                <h3 className="text-xl font-semibold">
+                  {profile.first_name} {profile.last_name}
+                </h3>
                 <p className="text-muted-foreground">@{profile.username}</p>
               </>
             ) : (
@@ -118,46 +169,76 @@ export default function ClientProfile({
             )}
           </div>
         </div>
-        
+
         {profile ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="bg-card p-4 rounded-lg border">
-              <h4 className="font-medium mb-2">Contact Information</h4>
-              <p className="text-sm text-muted-foreground">Email: {user.email}</p>
-              {profile.phone_number && (
-                <p className="text-sm text-muted-foreground">
-                  Phone: {profile.phone_number} 
-                  {profile.is_phone_verified ? 
-                    <span className="text-green-500 ml-2">(Verified)</span> : 
-                    <span className="text-amber-500 ml-2">(Not verified)</span>
-                  }
-                </p>
-              )}
-            </div>
-            
-            <div className="bg-card p-4 rounded-lg border">
-              <h4 className="font-medium mb-2">Account Status</h4>
-              <p className="text-sm text-muted-foreground">
-                Terms accepted: {profile.has_accepted_terms ? 
-                  <span className="text-green-500">Yes</span> : 
-                  <span className="text-amber-500">No</span>
-                }
-              </p>
-              <p className="text-sm text-muted-foreground">
-                Account created: {new Date(profile.created_at).toLocaleDateString()}
-              </p>
-            </div>
+          <div className="flex flex-col gap-4">
+            {sectionsOrder.map((sec) => (
+              <div
+                key={sec}
+                draggable
+                onDragStart={handleDragStart(sec)}
+                onDragOver={handleDragOver(sec)}
+                onDrop={handleDrop}
+                className="cursor-move"
+              >
+                {sec === "contact" && (
+                  <div className="bg-card p-4 rounded-lg border">
+                    <h4 className="font-medium mb-2">Contact Information</h4>
+                    <p className="text-sm text-muted-foreground">
+                      Email: {user.email}
+                    </p>
+                    {profile.phone_number && (
+                      <p className="text-sm text-muted-foreground">
+                        Phone: {profile.phone_number}
+                        {profile.is_phone_verified ? (
+                          <span className="text-green-500 ml-2">
+                            (Verified)
+                          </span>
+                        ) : (
+                          <span className="text-amber-500 ml-2">
+                            (Not verified)
+                          </span>
+                        )}
+                      </p>
+                    )}
+                  </div>
+                )}
+                {sec === "status" && (
+                  <div className="bg-card p-4 rounded-lg border">
+                    <h4 className="font-medium mb-2">Account Status</h4>
+                    <p className="text-sm text-muted-foreground">
+                      Terms accepted:{" "}
+                      {profile.has_accepted_terms ? (
+                        <span className="text-green-500">Yes</span>
+                      ) : (
+                        <span className="text-amber-500">No</span>
+                      )}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      Account created:{" "}
+                      {new Date(profile.created_at).toLocaleDateString()}
+                    </p>
+                  </div>
+                )}
+                {sec === "upcoming" && (
+                  <UpcomingCleaningEvents lastName={profile?.last_name} />
+                )}
+              </div>
+            ))}
           </div>
         ) : (
           <div className="bg-amber-50 p-4 rounded-lg border border-amber-200">
-            <p className="text-amber-800 mb-3">Your profile information is incomplete.</p>
-            
+            <p className="text-amber-800 mb-3">
+              Your profile information is incomplete.
+            </p>
+
             {hasPendingProfile ? (
               <div>
                 <p className="text-sm text-amber-800 mb-2">
-                  We found your saved profile information. Would you like to apply it now?
+                  We found your saved profile information. Would you like to
+                  apply it now?
                 </p>
-                <button 
+                <button
                   onClick={applyPendingProfile}
                   className="bg-primary text-white px-4 py-2 rounded-md text-sm hover:bg-primary/90"
                 >
@@ -165,9 +246,13 @@ export default function ClientProfile({
                 </button>
               </div>
             ) : (
-              <form action="/api/user-profile/create" method="POST" className="mt-2">
-                <input type="hidden" name="email" value={user.email || ''} />
-                <button 
+              <form
+                action="/api/user-profile/create"
+                method="POST"
+                className="mt-2"
+              >
+                <input type="hidden" name="email" value={user.email || ""} />
+                <button
                   type="submit"
                   className="bg-primary text-white px-4 py-2 rounded-md text-sm hover:bg-primary/90"
                 >
@@ -178,10 +263,7 @@ export default function ClientProfile({
           </div>
         )}
       </div>
-      
       {/* User details and tutorial steps removed as per design update */}
-
-      <UpcomingCleaningEvents lastName={profile?.last_name} />
     </div>
   );
 }
