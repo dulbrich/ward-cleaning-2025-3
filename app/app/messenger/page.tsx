@@ -2,32 +2,32 @@
 
 import { Button } from "@/components/ui/button";
 import {
-    Card,
-    CardContent,
-    CardFooter,
-    CardHeader,
-    CardTitle
+  Card,
+  CardContent,
+  CardFooter,
+  CardHeader,
+  CardTitle
 } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuTrigger
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createClient } from "@/utils/supabase/client";
 import { format, parse, parseISO } from "date-fns";
 import {
-    Check,
-    CheckCircle2,
-    ChevronDown,
-    MessageSquare,
-    RefreshCw,
-    Search,
-    Star,
-    X
+  Check,
+  CheckCircle2,
+  ChevronDown,
+  MessageSquare,
+  RefreshCw,
+  Search,
+  Star,
+  X
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -55,13 +55,13 @@ interface ContactWithMessagingInfo {
   messageSent: boolean;
 }
 
-// Group selectors
+// Group selectors - Updated to match schedule system
 const GROUP_OPTIONS = [
   { value: "all", label: "All Groups" },
-  { value: "A-F", label: "Group A-F" },
-  { value: "G-M", label: "Group G-M" },
-  { value: "N-S", label: "Group N-S" },
-  { value: "T-Z", label: "Group T-Z" }
+  { value: "A", label: "Group A (A-F)" },
+  { value: "B", label: "Group B (G-L)" },
+  { value: "C", label: "Group C (M-R)" },
+  { value: "D", label: "Group D (S-Z)" }
 ];
 
 // Add cleaning schedule interface
@@ -84,9 +84,29 @@ export default function MessengerPage() {
   const [loadingCampaigns, setLoadingCampaigns] = useState(true);
   const [previewContact, setPreviewContact] = useState<ContactWithMessagingInfo | null>(null);
   const [nextSchedule, setNextSchedule] = useState<CleaningSchedule | null>(null);
+  const [customGroupAssignments, setCustomGroupAssignments] = useState<Map<string, string>>(new Map());
+  const [selectedBranch, setSelectedBranch] = useState<string | null>(null);
 
-  const supabase = createClient();
-
+    const supabase = createClient();
+  
+  // Load custom group assignments
+  const loadCustomGroupAssignments = async (wardBranchId: string) => {
+    try {
+      const response = await fetch(`/api/ward-members/groups/${wardBranchId}`);
+      const data = await response.json();
+      
+      if (data.success && data.data.customAssignments) {
+        const assignmentMap = new Map<string, string>();
+        data.data.customAssignments.forEach((assignment: any) => {
+          assignmentMap.set(assignment.user_hash, assignment.assigned_group);
+        });
+        setCustomGroupAssignments(assignmentMap);
+      }
+    } catch (error) {
+      console.error("Error loading group assignments:", error);
+    }
+  };
+  
   // Load campaigns
   useEffect(() => {
     const fetchCampaigns = async () => {
@@ -110,7 +130,7 @@ export default function MessengerPage() {
         }
         
         // Find default campaign
-        let defaultCampaign = data?.find(c => c.is_default);
+        let defaultCampaign = data?.find((c: Campaign) => c.is_default);
         
         setCampaigns(data || []);
         
@@ -228,12 +248,26 @@ export default function MessengerPage() {
           const firstName = nameParts[0] || '';
           const lastName = nameParts.length > 1 ? nameParts[nameParts.length - 1] : '';
           
-          // Determine group based on last name
-          let group = "A-F";
-          const firstLetter = lastName.charAt(0).toUpperCase();
-          if (firstLetter >= 'G' && firstLetter <= 'M') group = "G-M";
-          else if (firstLetter >= 'N' && firstLetter <= 'S') group = "N-S";
-          else if (firstLetter >= 'T' && firstLetter <= 'Z') group = "T-Z";
+          // Find the original contact to get the unformatted phone for user hash
+          const originalContact = contactsToProcess.find((c: any) => c.name === contact.name);
+          const originalPhone = originalContact?.phone || contact.phone || '';
+          
+          // Create user hash for custom group lookup using ORIGINAL phone (not formatted)
+          const userHash = `${firstName}_${lastName}_${originalPhone}`.replace(/\s+/g, '_').toLowerCase();
+          
+          // Determine group - first check custom assignments, then default by last name
+          let group = "A";
+          const customGroup = customGroupAssignments.get(userHash);
+          if (customGroup) {
+            group = customGroup;
+          } else {
+            // Default group assignment based on last name (same as schedule system)
+            const firstLetter = lastName.charAt(0).toUpperCase();
+            if (firstLetter >= 'A' && firstLetter <= 'F') group = 'A';
+            else if (firstLetter >= 'G' && firstLetter <= 'L') group = 'B';
+            else if (firstLetter >= 'M' && firstLetter <= 'R') group = 'C';
+            else if (firstLetter >= 'S' && firstLetter <= 'Z') group = 'D';
+          }
           
           return {
             originalContact: contact,
@@ -247,6 +281,13 @@ export default function MessengerPage() {
           };
         });
         
+        // Sort contacts alphabetically by last name, then first name
+        processedContacts.sort((a, b) => {
+          const lastNameCompare = a.lastName.localeCompare(b.lastName);
+          if (lastNameCompare !== 0) return lastNameCompare;
+          return a.firstName.localeCompare(b.firstName);
+        });
+
         setContacts(processedContacts);
       } catch (error) {
         console.error("Error processing ward data:", error);
@@ -256,9 +297,9 @@ export default function MessengerPage() {
       }
     };
     
-    loadContactsFromWardData();
-  }, []);
-
+        loadContactsFromWardData();
+  }, [customGroupAssignments]);
+  
   // Load next scheduled cleaning on mount
   useEffect(() => {
     const fetchNextCleaning = async () => {
@@ -271,10 +312,14 @@ export default function MessengerPage() {
         // Get user's ward branches
         const { data: wardBranches } = await supabase
           .from('ward_branches')
-          .select('id')
+          .select('*')
           .eq('user_id', user.id);
         
         if (!wardBranches || wardBranches.length === 0) return;
+        
+        // Set the primary branch for group assignments
+        const primaryBranch = wardBranches.find((wb: any) => wb.is_primary) || wardBranches[0];
+        setSelectedBranch(primaryBranch.id);
         
         // Get current date as ISO string
         const today = new Date();
@@ -284,7 +329,7 @@ export default function MessengerPage() {
         const { data, error } = await supabase
           .from('cleaning_schedules')
           .select('*')
-          .in('ward_branch_id', wardBranches.map(wb => wb.id))
+          .in('ward_branch_id', wardBranches.map((wb: any) => wb.id))
           .gte('cleaning_date', todayISO)
           .order('cleaning_date')
           .limit(1);
@@ -300,15 +345,8 @@ export default function MessengerPage() {
           if (schedule.assigned_group === 'All') {
             setSelectedGroupFilter('all');
           } else {
-            // Map the assigned group to our filter format
-            const groupMapping: Record<string, string> = {
-              'A': 'A-F',
-              'B': 'G-M',
-              'C': 'N-S',
-              'D': 'T-Z'
-            };
-            const mappedGroup = groupMapping[schedule.assigned_group] || 'all';
-            setSelectedGroupFilter(mappedGroup);
+            // Use the assigned group directly since we now use A, B, C, D system
+            setSelectedGroupFilter(schedule.assigned_group);
           }
         }
       } catch (error) {
@@ -316,9 +354,16 @@ export default function MessengerPage() {
       }
     };
     
-    fetchNextCleaning();
+        fetchNextCleaning();
   }, []);
-
+  
+  // Load custom group assignments when selectedBranch changes
+  useEffect(() => {
+    if (selectedBranch) {
+      loadCustomGroupAssignments(selectedBranch);
+    }
+  }, [selectedBranch]);
+  
   // Filter contacts based on current filters
   const filteredContacts = useMemo(() => {
     return contacts.filter(contact => {
@@ -384,22 +429,22 @@ export default function MessengerPage() {
 
   // Mark a contact as messaged
   const markContactMessaged = (contactId: string) => {
-    setContacts(contacts.map(c => 
+    setContacts(contacts.map((c: ContactWithMessagingInfo) => 
       c.id === contactId ? { ...c, messageSent: true } : c
     ));
   };
 
   // Mark all filtered contacts as messaged
   const markAllMessaged = () => {
-    setContacts(contacts.map(c => 
-      filteredContacts.some(fc => fc.id === c.id) ? { ...c, messageSent: true } : c
-    ));
+            setContacts(contacts.map((c: ContactWithMessagingInfo) => 
+          filteredContacts.some(fc => fc.id === c.id) ? { ...c, messageSent: true } : c
+        ));
     toast.success("All contacts marked as messaged");
   };
 
   // Reset message status for all contacts
   const resetMessageStatus = () => {
-    setContacts(contacts.map(c => ({ ...c, messageSent: false })));
+    setContacts(contacts.map((c: ContactWithMessagingInfo) => ({ ...c, messageSent: false })));
     toast.success("Message status reset for all contacts");
   };
 
@@ -608,7 +653,7 @@ export default function MessengerPage() {
 
         {/* Right Panel: Contact List */}
         <div className="lg:col-span-2 space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
             <h2 className="text-xl font-medium flex items-center gap-2">
               Contacts
               <span className="text-sm font-normal text-muted-foreground">
@@ -617,7 +662,7 @@ export default function MessengerPage() {
             </h2>
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <span>Showing:</span>
-              <span className="bg-primary/10 text-primary px-2 py-1 rounded-full">
+              <span className="bg-primary/10 text-primary px-2 py-1 rounded-full text-xs sm:text-sm">
                 {showOnlyNonUsers ? 'Non-Users' : 'All Contacts'} {selectedGroupFilter !== 'all' ? `in ${selectedGroupFilter}` : ''}
               </span>
             </div>

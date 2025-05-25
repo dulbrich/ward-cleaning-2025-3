@@ -212,29 +212,29 @@ export default function ParticipationModal({
                   return (
                     <div 
                       key={member.userHash || index}
-                      className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors"
+                      className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors space-y-2 sm:space-y-0"
                     >
                       <div className="flex-1">
                         <div className="font-medium text-foreground">
                           {member.name}
                         </div>
-                        <div className="flex items-center space-x-4 text-sm text-muted-foreground mt-1">
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-4 text-sm text-muted-foreground mt-1 space-y-1 sm:space-y-0">
                           {member.phone && (
                             <div className="flex items-center">
-                              <Phone className="w-3 h-3 mr-1" />
-                              {member.phone}
+                              <Phone className="w-3 h-3 mr-1 flex-shrink-0" />
+                              <span className="break-all">{member.phone}</span>
                             </div>
                           )}
                           {member.email && (
                             <div className="flex items-center">
-                              <Mail className="w-3 h-3 mr-1" />
-                              {member.email}
+                              <Mail className="w-3 h-3 mr-1 flex-shrink-0" />
+                              <span className="break-all text-xs sm:text-sm">{member.email}</span>
                             </div>
                           )}
                         </div>
                       </div>
                       
-                      <div className="text-right">
+                      <div className="text-left sm:text-right">
                         <div className="flex items-center space-x-2">
                           <Badge variant={badge.variant} className={badge.className}>
                             {IconComponent && <IconComponent className="w-3 h-3 mr-1" />}
