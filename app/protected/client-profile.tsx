@@ -2,9 +2,9 @@
 
 import { FormMessage, Message } from "@/components/form-message";
 
+import UpcomingCleaningEvents from "@/components/dashboard/upcoming-cleaning-events";
 import Image from "next/image";
 import { useEffect, useState } from "react";
-import UpcomingCleaningEvents from "@/components/dashboard/upcoming-cleaning-events";
 
 // Client component for checking local storage
 export default function ClientProfile({ 
@@ -98,6 +98,7 @@ export default function ClientProfile({
                 src={profile.avatar_url}
                 alt="Your avatar"
                 fill
+                sizes="80px"
                 className="object-cover"
               />
             </div>

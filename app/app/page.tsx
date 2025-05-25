@@ -37,10 +37,10 @@ async function getUserProfile(userId: string) {
 export default async function AppPage({
   searchParams
 }: {
-  searchParams?: { 
+  searchParams?: Promise<{ 
     type?: string;
     message?: string;
-  };
+  }>;
 }) {
   const supabase = await createClient();
 
@@ -55,16 +55,19 @@ export default async function AppPage({
   // Get the user's profile
   const profile = await getUserProfile(user.id);
   
+  // Await searchParams before using its properties
+  const params = await searchParams;
+  
   // Build message from search params if present
   let message: Message | null = null;
   
-  if (searchParams?.type && searchParams?.message) {
-    if (searchParams.type === 'error') {
-      message = { error: searchParams.message };
-    } else if (searchParams.type === 'success') {
-      message = { success: searchParams.message };
+  if (params?.type && params?.message) {
+    if (params.type === 'error') {
+      message = { error: params.message };
+    } else if (params.type === 'success') {
+      message = { success: params.message };
     } else {
-      message = { message: searchParams.message };
+      message = { message: params.message };
     }
   }
 

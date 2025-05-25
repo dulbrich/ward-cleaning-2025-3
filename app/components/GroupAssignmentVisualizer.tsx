@@ -35,7 +35,7 @@ interface GroupDistribution {
 interface GroupAssignmentVisualizerProps {
   wardMembers: WardMember[];
   wardBranchId: string;
-  onGroupChange: (userHash: string, newGroup: string, householdId: string) => void;
+  onBulkGroupChange: (assignments: Array<{ userHash: string; newGroup: string; householdId: string }>) => Promise<void>;
   onViewParticipants: (group: 'A' | 'B' | 'C' | 'D', members: WardMember[]) => void;
   height?: number;
 }
@@ -62,7 +62,7 @@ const MIN_SECTION_HEIGHT = 140;
 export default function GroupAssignmentVisualizer({
   wardMembers,
   wardBranchId,
-  onGroupChange,
+  onBulkGroupChange,
   onViewParticipants,
   height = CONTAINER_HEIGHT
 }: GroupAssignmentVisualizerProps) {
@@ -71,6 +71,10 @@ export default function GroupAssignmentVisualizer({
   const [isDragging, setIsDragging] = useState(false);
   const [dragStartY, setDragStartY] = useState(0);
   const [dragBoundaryIndex, setDragBoundaryIndex] = useState(-1);
+  const [pendingChanges, setPendingChanges] = useState<Map<string, string>>(new Map()); // userHash -> newGroup
+  const [isSaving, setIsSaving] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(false);
+  const [justSaved, setJustSaved] = useState(false);
 
   // Group members by household
   const groupMembersByHousehold = useCallback((members: WardMember[]): Household[] => {
@@ -138,12 +142,20 @@ export default function GroupAssignmentVisualizer({
 
   // Initialize households and distributions
   useEffect(() => {
-    const householdList = groupMembersByHousehold(wardMembers);
-    setHouseholds(householdList);
-    
-    const distributions = calculateGroupDistributions(householdList);
-    setGroupDistributions(distributions);
-  }, [wardMembers, groupMembersByHousehold, calculateGroupDistributions]);
+    // Only update state if we're not currently saving, don't have pending changes, and didn't just save
+    // This prevents the UI from flickering when the parent state updates during save
+    if (!isSaving && pendingChanges.size === 0 && !justSaved) {
+      const householdList = groupMembersByHousehold(wardMembers);
+      setHouseholds(householdList);
+      
+      const distributions = calculateGroupDistributions(householdList);
+      setGroupDistributions(distributions);
+      
+      if (!isInitialized) {
+        setIsInitialized(true);
+      }
+    }
+  }, [wardMembers, groupMembersByHousehold, calculateGroupDistributions, isSaving, pendingChanges.size, isInitialized, justSaved]);
 
   // Handle drag start
   const handleDragStart = (e: React.MouseEvent | React.TouchEvent, boundaryIndex: number) => {
@@ -162,26 +174,42 @@ export default function GroupAssignmentVisualizer({
     const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
     const deltaY = clientY - dragStartY;
     
-    // Simple threshold-based redistribution
-    if (Math.abs(deltaY) > 30) {
+    // Continuous redistribution based on cumulative drag distance
+    // Every 40 pixels of drag distance moves one household
+    const moveThreshold = 40;
+    const householdsToMove = Math.floor(Math.abs(deltaY) / moveThreshold);
+    
+    if (householdsToMove > 0) {
       const currentGroup = groupDistributions[dragBoundaryIndex];
       const nextGroup = groupDistributions[dragBoundaryIndex + 1];
       
       if (currentGroup && nextGroup) {
-        // Find households to move based on drag direction
-        if (deltaY > 0 && currentGroup.households.length > 0) {
-          // Move household from current to next group
-          const householdToMove = currentGroup.households[currentGroup.households.length - 1];
-          redistributeHousehold(householdToMove, nextGroup.group);
-        } else if (deltaY < 0 && nextGroup.households.length > 0) {
-          // Move household from next to current group
-          const householdToMove = nextGroup.households[0];
-          redistributeHousehold(householdToMove, currentGroup.group);
+        let moved = 0;
+        
+        if (deltaY > 0) {
+          // Dragging DOWN: Move households from next group to current group (upper group gets bigger)
+          while (moved < householdsToMove && nextGroup.households.length > 0) {
+            const householdToMove = nextGroup.households[0];
+            redistributeHousehold(householdToMove, currentGroup.group);
+            moved++;
+          }
+        } else if (deltaY < 0) {
+          // Dragging UP: Move households from current group to next group (upper group gets smaller)
+          while (moved < householdsToMove && currentGroup.households.length > 0) {
+            const householdToMove = currentGroup.households[currentGroup.households.length - 1];
+            redistributeHousehold(householdToMove, nextGroup.group);
+            moved++;
+          }
+        }
+        
+        // Update drag start position based on how many households were actually moved
+        // This allows for continuous dragging while preventing duplicate moves
+        if (moved > 0) {
+          const pixelsPerMove = moveThreshold;
+          const newDragStart = dragStartY + (moved * pixelsPerMove * (deltaY > 0 ? 1 : -1));
+          setDragStartY(newDragStart);
         }
       }
-      
-      // Reset drag position to prevent multiple moves
-      setDragStartY(clientY);
     }
   }, [isDragging, dragBoundaryIndex, dragStartY, groupDistributions]);
 
@@ -192,9 +220,9 @@ export default function GroupAssignmentVisualizer({
     setDragStartY(0);
   }, []);
 
-  // Redistribute household to new group
+  // Redistribute household to new group (local state only, no API call)
   const redistributeHousehold = (household: Household, newGroup: 'A' | 'B' | 'C' | 'D') => {
-    // Update household group
+    // Update household group in local state
     const updatedHouseholds = households.map(h => 
       h.id === household.id ? { ...h, currentGroup: newGroup } : h
     );
@@ -204,12 +232,87 @@ export default function GroupAssignmentVisualizer({
     const newDistributions = calculateGroupDistributions(updatedHouseholds);
     setGroupDistributions(newDistributions);
     
-    // Notify parent component of changes
+    // Track pending changes for each member in the household
+    const newPendingChanges = new Map(pendingChanges);
     household.members.forEach(member => {
       if (member.userHash) {
-        onGroupChange(member.userHash, newGroup, household.id);
+        newPendingChanges.set(member.userHash, newGroup);
       }
     });
+    setPendingChanges(newPendingChanges);
+  };
+
+  // Save all pending changes to the database
+  const handleSaveChanges = async () => {
+    if (pendingChanges.size === 0) return;
+    
+    setIsSaving(true);
+    setJustSaved(false);
+    
+    // Store current state as backup in case of error
+    const backupHouseholds = [...households];
+    const backupDistributions = [...groupDistributions];
+    
+    try {
+      // Collect all changes for batch processing
+      const batchChanges: Array<{ userHash: string; newGroup: string; householdId: string }> = [];
+      
+      pendingChanges.forEach((newGroup, userHash) => {
+        const member = wardMembers.find(m => m.userHash === userHash);
+        if (member) {
+          const household = households.find(h => h.members.some(m => m.userHash === userHash));
+          if (household) {
+            batchChanges.push({
+              userHash,
+              newGroup,
+              householdId: household.id
+            });
+          }
+        }
+      });
+      
+      // Send all changes as a single batch to avoid race conditions
+      if (batchChanges.length > 0) {
+        await onBulkGroupChange(batchChanges);
+      }
+      
+      // Mark that we just saved to prevent useEffect from resetting state
+      setJustSaved(true);
+      
+      // Clear pending changes after successful save
+      setPendingChanges(new Map());
+      
+      // Reset the justSaved flag after a delay to allow normal state sync later
+      setTimeout(() => {
+        setJustSaved(false);
+      }, 1000);
+      
+    } catch (error) {
+      console.error('Error saving changes:', error);
+      
+      // Restore backup state on error
+      setHouseholds(backupHouseholds);
+      setGroupDistributions(backupDistributions);
+      
+      // Don't clear pending changes so user can retry
+      alert('Failed to save changes. Please try again.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Reset all pending changes
+  const handleResetChanges = () => {
+    // Reset to original ward member groups
+    const originalHouseholds = groupMembersByHousehold(wardMembers);
+    setHouseholds(originalHouseholds);
+    
+    const originalDistributions = calculateGroupDistributions(originalHouseholds);
+    setGroupDistributions(originalDistributions);
+    
+    // Clear pending changes and reset save flag
+    setPendingChanges(new Map());
+    setJustSaved(false);
   };
 
   // Add event listeners for drag
@@ -243,6 +346,44 @@ export default function GroupAssignmentVisualizer({
           Households will stay together during redistribution.
         </p>
       </Card>
+      
+      {/* Save/Reset Controls - Show when there are pending changes */}
+      {pendingChanges.size > 0 && (
+        <Card className="p-4 max-w-2xl w-full border-amber-200 bg-amber-50/50 dark:border-amber-800 dark:bg-amber-950/50">
+          <div className="flex items-center justify-between">
+            <div className="text-sm text-amber-700 dark:text-amber-300 flex items-center">
+              <div className="w-2 h-2 bg-amber-500 rounded-full mr-2 animate-pulse"></div>
+              {pendingChanges.size} unsaved change{pendingChanges.size !== 1 ? 's' : ''}
+            </div>
+            <div className="flex space-x-2">
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={handleResetChanges}
+                disabled={isSaving}
+                className="border-amber-300 text-amber-700 hover:bg-amber-100 dark:border-amber-700 dark:text-amber-300 dark:hover:bg-amber-900"
+              >
+                Reset
+              </Button>
+              <Button 
+                size="sm"
+                onClick={handleSaveChanges}
+                disabled={isSaving}
+                className="bg-amber-600 hover:bg-amber-700 text-white"
+              >
+                {isSaving ? (
+                  <>
+                    <div className="animate-spin h-4 w-4 border-2 border-white rounded-full border-t-transparent mr-2"></div>
+                    Saving...
+                  </>
+                ) : (
+                  'Save Changes'
+                )}
+              </Button>
+            </div>
+          </div>
+        </Card>
+      )}
       
       {/* Visualizer Container */}
       <Card className="overflow-hidden w-full max-w-md">

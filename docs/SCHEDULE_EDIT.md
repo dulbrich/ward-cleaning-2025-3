@@ -121,6 +121,32 @@ CREATE TABLE ward_member_groups (
 -- Index for performance
 CREATE INDEX idx_ward_member_groups_lookup ON ward_member_groups(ward_branch_id, assigned_group);
 CREATE INDEX idx_ward_member_groups_household ON ward_member_groups(household_id);
+CREATE INDEX idx_ward_member_groups_user_hash ON ward_member_groups(user_hash);
+
+-- Row Level Security
+ALTER TABLE ward_member_groups ENABLE ROW LEVEL SECURITY;
+
+-- Policy for ward administrators
+CREATE POLICY "Ward admins can manage group assignments" ON ward_member_groups
+    FOR ALL USING (
+        ward_branch_id IN (
+            SELECT wb.id FROM ward_branches wb
+            JOIN ward_branch_members wbm ON wb.id = wbm.ward_branch_id
+            WHERE wbm.user_id = auth.uid() AND wbm.role IN ('admin', 'leader')
+        )
+    );
+
+-- Updated trigger for updated_at
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ language 'plpgsql';
+
+CREATE TRIGGER update_ward_member_groups_updated_at BEFORE UPDATE
+    ON ward_member_groups FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 ```
 
 #### 3.2.2 Participation Tracking View
@@ -447,6 +473,64 @@ interface ParticipationStatsResponse {
 - SMS notification integration for group changes
 - Calendar integration for assignment reminders
 - Gamification features for participation tracking
+
+---
+
+## Required Database Schema
+
+Based on the error logs, the `ward_member_groups` table doesn't exist in your Supabase database. You need to run this SQL in your Supabase SQL editor:
+
+```sql
+-- Create the ward_member_groups table
+CREATE TABLE ward_member_groups (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    ward_branch_id UUID NOT NULL REFERENCES ward_branches(id) ON DELETE CASCADE,
+    user_hash VARCHAR NOT NULL,
+    assigned_group VARCHAR(1) NOT NULL CHECK (assigned_group IN ('A', 'B', 'C', 'D')),
+    assignment_date TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    assigned_by UUID REFERENCES auth.users(id),
+    household_id VARCHAR, -- For grouping household members
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    
+    UNIQUE(ward_branch_id, user_hash)
+);
+
+-- Indexes for performance
+CREATE INDEX idx_ward_member_groups_lookup ON ward_member_groups(ward_branch_id, assigned_group);
+CREATE INDEX idx_ward_member_groups_household ON ward_member_groups(household_id);
+CREATE INDEX idx_ward_member_groups_user_hash ON ward_member_groups(user_hash);
+
+-- Row Level Security
+ALTER TABLE ward_member_groups ENABLE ROW LEVEL SECURITY;
+
+-- Policy for ward administrators
+CREATE POLICY "Ward admins can manage group assignments" ON ward_member_groups
+    FOR ALL USING (
+        ward_branch_id IN (
+            SELECT wb.id FROM ward_branches wb
+            JOIN ward_branch_members wbm ON wb.id = wbm.ward_branch_id
+            WHERE wbm.user_id = auth.uid() AND wbm.role IN ('admin', 'leader')
+        )
+    );
+
+-- Updated trigger for updated_at
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ language 'plpgsql';
+
+CREATE TRIGGER update_ward_member_groups_updated_at BEFORE UPDATE
+    ON ward_member_groups FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+```
+
+**To fix the current issues:**
+
+1. **Copy the SQL above** and run it in your Supabase SQL Editor
+2. **Restart your development server** after creating the table
 
 ---
 

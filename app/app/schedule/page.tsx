@@ -1,24 +1,24 @@
 "use client";
 
 import {
-  Button,
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-  Tabs,
-  TabsList,
-  TabsTrigger
+    Button,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+    Tabs,
+    TabsList,
+    TabsTrigger
 } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/utils/supabase/client";
@@ -873,24 +873,9 @@ export default function SchedulePage() {
     }
   };
 
-  const handleGroupChange = async (userHash: string, newGroup: string, householdId: string) => {
-    if (!selectedBranch) return;
+  const handleBulkGroupChange = async (assignments: Array<{ userHash: string; newGroup: string; householdId: string }>) => {
+    if (!selectedBranch || assignments.length === 0) return;
     
-    // Update local state immediately
-    const updatedAssignments = new Map(customGroupAssignments);
-    updatedAssignments.set(userHash, newGroup);
-    setCustomGroupAssignments(updatedAssignments);
-    
-    // Update ward members with new group assignments
-    const updatedMembers = wardMembers.map(member => {
-      if (member.userHash === userHash) {
-        return { ...member, group: newGroup };
-      }
-      return member;
-    });
-    setWardMembers(updatedMembers);
-    
-    // Save to database
     try {
       setSavingGroupAssignments(true);
       
@@ -901,28 +886,42 @@ export default function SchedulePage() {
         },
         body: JSON.stringify({
           wardBranchId: selectedBranch,
-          assignments: [{
-            userHash,
-            newGroup: newGroup as 'A' | 'B' | 'C' | 'D',
-            householdId
-          }]
+          assignments: assignments.map(assignment => ({
+            userHash: assignment.userHash,
+            newGroup: assignment.newGroup as 'A' | 'B' | 'C' | 'D',
+            householdId: assignment.householdId
+          }))
         }),
       });
 
       const data = await response.json();
       
       if (!data.success) {
-        throw new Error(data.error || 'Failed to update group assignment');
+        throw new Error(data.error || 'Failed to update group assignments');
       }
       
-      toast.success("Group assignment updated successfully");
-    } catch (error) {
-      console.error("Error updating group assignment:", error);
-      toast.error("Failed to update group assignment");
+      // Update local state after successful save
+      const updatedAssignments = new Map(customGroupAssignments);
+      assignments.forEach(assignment => {
+        updatedAssignments.set(assignment.userHash, assignment.newGroup);
+      });
+      setCustomGroupAssignments(updatedAssignments);
       
-      // Revert local changes on error
-      setCustomGroupAssignments(customGroupAssignments);
-      setWardMembers(wardMembers);
+      // Update ward members with new group assignments
+      const updatedMembers = wardMembers.map(member => {
+        const assignment = assignments.find(a => a.userHash === member.userHash);
+        if (assignment) {
+          return { ...member, group: assignment.newGroup };
+        }
+        return member;
+      });
+      setWardMembers(updatedMembers);
+      
+      toast.success(`Updated ${assignments.length} group assignment${assignments.length > 1 ? 's' : ''} successfully`);
+    } catch (error) {
+      console.error("Error updating group assignments:", error);
+      toast.error("Failed to update group assignments");
+      throw error; // Re-throw so the visualizer can handle the error
     } finally {
       setSavingGroupAssignments(false);
     }
@@ -974,7 +973,7 @@ export default function SchedulePage() {
           <GroupAssignmentVisualizer
             wardMembers={membersWithCustomGroups}
             wardBranchId={selectedBranch || ''}
-            onGroupChange={handleGroupChange}
+            onBulkGroupChange={handleBulkGroupChange}
             onViewParticipants={handleViewParticipants}
           />
         )}

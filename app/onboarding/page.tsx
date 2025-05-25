@@ -352,6 +352,7 @@ function OnboardingContent() {
                     src={avatar}
                     alt={`Avatar ${index+1}`}
                     fill
+                    sizes="64px"
                     className="object-cover"
                   />
                 </div>
@@ -376,6 +377,7 @@ function OnboardingContent() {
                     src={avatar}
                     alt={`Monster Avatar ${index+1}`}
                     fill
+                    sizes="64px"
                     className="object-cover"
                   />
                 </div>

@@ -5,8 +5,9 @@ import { Button } from "@/components/ui/button";
 import {
     Dialog,
     DialogContent,
+    DialogDescription,
     DialogHeader,
-    DialogTitle,
+    DialogTitle
 } from "@/components/ui/dialog";
 import { Mail, Phone, TrendingDown, TrendingUp, Users } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -163,6 +164,9 @@ export default function ParticipationModal({
               {members.length} members
             </Badge>
           </DialogTitle>
+          <DialogDescription>
+            View detailed participation statistics and member information for Group {group}.
+          </DialogDescription>
         </DialogHeader>
 
         {/* Group Summary Statistics */}
