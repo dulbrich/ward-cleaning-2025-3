@@ -119,7 +119,7 @@ export default function ClientProfile({
             )}
           </div>
         </div>
-        
+        <UpcomingCleaningEvents lastName={profile?.last_name} />
         {profile ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="bg-card p-4 rounded-lg border">
@@ -181,8 +181,6 @@ export default function ClientProfile({
       </div>
       
       {/* User details and tutorial steps removed as per design update */}
-
-      <UpcomingCleaningEvents lastName={profile?.last_name} />
     </div>
   );
 }

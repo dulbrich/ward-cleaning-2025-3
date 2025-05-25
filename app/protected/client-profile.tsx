@@ -120,36 +120,7 @@ export default function ClientProfile({
           </div>
         </div>
         
-        {profile ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="bg-card p-4 rounded-lg border">
-              <h4 className="font-medium mb-2">Contact Information</h4>
-              <p className="text-sm text-muted-foreground">Email: {user.email}</p>
-              {profile.phone_number && (
-                <p className="text-sm text-muted-foreground">
-                  Phone: {profile.phone_number} 
-                  {profile.is_phone_verified ? 
-                    <span className="text-green-500 ml-2">(Verified)</span> : 
-                    <span className="text-amber-500 ml-2">(Not verified)</span>
-                  }
-                </p>
-              )}
-            </div>
-            
-            <div className="bg-card p-4 rounded-lg border">
-              <h4 className="font-medium mb-2">Account Status</h4>
-              <p className="text-sm text-muted-foreground">
-                Terms accepted: {profile.has_accepted_terms ? 
-                  <span className="text-green-500">Yes</span> : 
-                  <span className="text-amber-500">No</span>
-                }
-              </p>
-              <p className="text-sm text-muted-foreground">
-                Account created: {new Date(profile.created_at).toLocaleDateString()}
-              </p>
-            </div>
-          </div>
-        ) : (
+        {!profile && (
           <div className="bg-amber-50 p-4 rounded-lg border border-amber-200">
             <p className="text-amber-800 mb-3">Your profile information is incomplete.</p>
             
@@ -183,6 +154,37 @@ export default function ClientProfile({
       {/* User details and tutorial steps removed as per design update */}
 
       <UpcomingCleaningEvents lastName={profile?.last_name} />
+      
+      {profile && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="bg-card p-4 rounded-lg border">
+            <h4 className="font-medium mb-2">Contact Information</h4>
+            <p className="text-sm text-muted-foreground">Email: {user.email}</p>
+            {profile.phone_number && (
+              <p className="text-sm text-muted-foreground">
+                Phone: {profile.phone_number} 
+                {profile.is_phone_verified ? 
+                  <span className="text-green-500 ml-2">(Verified)</span> : 
+                  <span className="text-amber-500 ml-2">(Not verified)</span>
+                }
+              </p>
+            )}
+          </div>
+          
+          <div className="bg-card p-4 rounded-lg border">
+            <h4 className="font-medium mb-2">Account Status</h4>
+            <p className="text-sm text-muted-foreground">
+              Terms accepted: {profile.has_accepted_terms ? 
+                <span className="text-green-500">Yes</span> : 
+                <span className="text-amber-500">No</span>
+              }
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Account created: {new Date(profile.created_at).toLocaleDateString()}
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
