@@ -89,7 +89,7 @@ export default function ClientProfile({
       </div>
       
       <div className="flex flex-col gap-6">
-        <h2 className="font-bold text-2xl">Your Profile</h2>
+        <h2 className="font-bold text-2xl">Dashboard</h2>
         
         <div className="flex items-center gap-4">
           {profile?.avatar_url ? (
