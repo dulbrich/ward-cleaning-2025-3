@@ -16,7 +16,7 @@ const defaultUrl = process.env.VERCEL_URL
 export const metadata = {
   metadataBase: new URL(defaultUrl),
   title: "Ward Cleaning App",
-  description: "Simplifying ward building cleaning management for the LDS church",
+  description: "Simplifying ward building cleaning management for the church",
   icons: {
     icon: "/images/logo.png",
   }

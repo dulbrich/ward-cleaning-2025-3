@@ -64,7 +64,7 @@ export default function UnauthenticatedLayout({
                       <span className="font-bold">Ward Cleaning</span>
                     </div>
                     <p className="text-sm text-muted-foreground">
-                      Simplifying ward building cleaning management for the LDS church
+                      Simplifying ward building cleaning management for the church
                     </p>
                   </div>
                   <div className="space-y-3">
