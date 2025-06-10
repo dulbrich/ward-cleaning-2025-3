@@ -80,7 +80,7 @@ function CodeBlock({ code }: { code: string }) {
   };
 
   return (
-    <div className="relative w-full" style={{ width: '70%' }}>
+    <div className="relative w-full md:w-[70%] mx-auto">
       <div className="bg-card border border-border rounded-md w-full">
         <div className="overflow-x-auto overflow-y-hidden w-full">
           {loaded ? (
