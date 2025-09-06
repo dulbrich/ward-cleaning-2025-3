@@ -1,7 +1,7 @@
 {
   "name": "Ward Cleaning",
   "short_name": "WardClean",
-  "description": "Simplifying ward building cleaning management for the LDS church",
+  "description": "Simplifying ward building cleaning management for the church",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
