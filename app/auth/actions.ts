@@ -2,10 +2,11 @@
 
 import { generateUserHash } from "@/app/app/tools/actions";
 import { createClient } from "@/utils/supabase/server";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 export async function signUp(formData: FormData) {
-  const origin = formData.get("origin") as string;
+  let origin = formData.get("origin") as string;
   const email = formData.get("email") as string;
   const password = formData.get("password") as string;
   const firstName = formData.get("firstName") as string;
@@ -15,6 +16,16 @@ export async function signUp(formData: FormData) {
   // Get session context if coming from cleaning session
   const sessionId = formData.get("sessionId") as string;
   const tempUserId = formData.get("tempUserId") as string;
+
+  // Fallback to headers if origin is not provided or is localhost
+  if (!origin || origin.includes('localhost')) {
+    const headersList = await headers();
+    const host = headersList.get('host');
+    const protocol = headersList.get('x-forwarded-proto') || (host?.includes('localhost') ? 'http' : 'https');
+    if (host) {
+      origin = `${protocol}://${host}`;
+    }
+  }
 
   const supabase = await createClient();
 
@@ -134,9 +145,19 @@ export async function signUp(formData: FormData) {
 }
 
 export async function signIn(formData: FormData) {
-  const origin = formData.get("origin") as string;
+  let origin = formData.get("origin") as string;
   const email = formData.get("email") as string;
   const password = formData.get("password") as string;
+
+  // Fallback to headers if origin is not provided or is localhost
+  if (!origin || origin.includes('localhost')) {
+    const headersList = await headers();
+    const host = headersList.get('host');
+    const protocol = headersList.get('x-forwarded-proto') || (host?.includes('localhost') ? 'http' : 'https');
+    if (host) {
+      origin = `${protocol}://${host}`;
+    }
+  }
 
   const supabase = await createClient();
 

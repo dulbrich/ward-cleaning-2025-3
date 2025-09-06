@@ -28,7 +28,10 @@ const SignUpPrompt: React.FC<SignUpPromptProps> = ({ isOpen, onClose }) => {
   
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent 
+        className="sm:max-w-md max-h-[90vh] overflow-y-auto w-[95vw]"
+        style={{ position: 'fixed', top: '5vh', transform: 'translateY(0) translateX(-50%)' }}
+      >
         <DialogHeader>
           <DialogTitle className="text-xl">Join Our Cleaning Team!</DialogTitle>
           <DialogDescription>

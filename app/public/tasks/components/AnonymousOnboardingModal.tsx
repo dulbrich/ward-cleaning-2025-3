@@ -2,11 +2,11 @@
 
 import { Button } from "@/components/ui/button";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
 } from "@/components/ui/dialog";
 import { CheckCircle2, User, XCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -52,7 +52,10 @@ const AnonymousOnboardingModal: FC<AnonymousOnboardingModalProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent 
+        className="sm:max-w-lg max-h-[90vh] overflow-y-auto w-[95vw]"
+        style={{ position: 'fixed', top: '5vh', transform: 'translateY(0) translateX(-50%)' }}
+      >
         <DialogHeader>
           <DialogTitle className="text-xl font-bold">Welcome to Ward Cleaning</DialogTitle>
           <DialogDescription className="text-base">

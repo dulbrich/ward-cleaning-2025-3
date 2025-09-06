@@ -268,7 +268,8 @@ export const signInAction = async (formData: FormData) => {
 
   if (error) {
     // Build error URL with context preservation
-    const errorUrl = new URL("/sign-in", getBaseUrl());
+    const baseUrl = await getBaseUrl();
+    const errorUrl = new URL("/sign-in", baseUrl);
     errorUrl.searchParams.set("type", "error");
     errorUrl.searchParams.set("message", error.message);
     if (sessionId) {
@@ -297,7 +298,8 @@ export const signInAction = async (formData: FormData) => {
     console.log("User needs onboarding. Redirecting to onboarding page.");
     
     // Build onboarding URL with context preservation
-    const onboardingUrl = new URL("/onboarding", getBaseUrl());
+    const baseUrl = await getBaseUrl();
+    const onboardingUrl = new URL("/onboarding", baseUrl);
     if (sessionId) {
       onboardingUrl.searchParams.set("sessionId", sessionId);
       if (tempUserId) {
@@ -368,12 +370,22 @@ export const signInAction = async (formData: FormData) => {
 };
 
 // Helper function to get base URL for constructing URLs
-function getBaseUrl() {
+async function getBaseUrl() {
   if (typeof window !== 'undefined') {
     return window.location.origin;
   }
-  // Server-side fallback
-  return process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+  // Server-side - get from request headers first
+  const headersList = await headers();
+  const host = headersList.get('host');
+  const protocol = headersList.get('x-forwarded-proto') || 'https';
+  
+  if (host) {
+    return `${protocol}://${host}`;
+  }
+  
+  // Fallback to environment variables
+  return process.env.NEXT_PUBLIC_BASE_URL || 
+         (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
 }
 
 export const forgotPasswordAction = async (formData: FormData) => {
